@@ -20,7 +20,7 @@ import java.util.logging.Logger;
  */
 public class Algorithm1 {
 
-    private static final String INPUT_PATH = "";
+    private static final String INPUT_PATH = "./";
 
     //
     //CONSTANTS THAT CONCERN DATES
@@ -40,8 +40,7 @@ public class Algorithm1 {
     /**
      * a map of string representations of dates, to date objects
      */
-    private static final HashMap<String, LocalDate> ENTRY_DATES
-            = getEntriesDates();
+    private static final HashMap<String, LocalDate> ENTRY_DATES = new HashMap<>();
 
     /**
      * indicates that DoB was not given
@@ -77,6 +76,8 @@ public class Algorithm1 {
      */
     public static void main(String[] args) throws FileNotFoundException, UnsupportedEncodingException {
 
+        getEntriesDates();
+
         //reads the file
         Scanner sc = new Scanner(new File(INPUT_PATH + "Client.csv"), "UTF-8");
 
@@ -87,13 +88,14 @@ public class Algorithm1 {
 
         // column header
         String headers = sc.nextLine();
-        StringBuilder sb = new StringBuilder(200*100_000);
+        StringBuilder sb = new StringBuilder(200 * 100_000);
         sb = sb.append(headers).append('\n');
 
         System.out.println("DEDUPLICATING ...");
 
         //for each entry
         while (sc.hasNextLine()) {
+
             String line = sc.nextLine();
             String[] array = line.split(",");
 
@@ -133,31 +135,36 @@ public class Algorithm1 {
                         ssn, ssnDataQuality,
                         dobS, dob, dobDataQuality, gender, line
                 );
-                boolean ifNew = checkTests(client);
-                if (ifNew) {
+                boolean isNew = isNewClient(client);
+                if (isNew) {
                     clients.add(client);
                 }
 
-            }//end if
+            }//end special date condition
 
         }//END WHILE
+
+        sc.close();
 
         System.out.println("WRITING OUTPUT FILES ...");
 
         // Get all other files
-        File[] files = new File("./" + INPUT_PATH).listFiles();
+        File[] files = new File(INPUT_PATH).listFiles();
         for (File file : files) {
             String filename = file.getName();
-            System.out.println(file.getName());
             // Get all CSVs
             if (filename.endsWith(".csv")) {
                 String noExtension = filename.substring(0, filename.indexOf(".csv"));
                 // A CSV provided by HUD
                 if (!noExtension.endsWith("Output")) {
+                    System.out.println("Writing to " + filename + "Output ...");
                     changePersonalIds(filename);
+                    System.out.println("Wrote to " + filename + "Output");
                 }
             }
         }
+
+        System.out.println("COUNT OF UNIQUE CLIENTS = " + clients.size());
 
     }//end main
 
@@ -168,13 +175,13 @@ public class Algorithm1 {
      *
      * @return if newClient is new (true) or not (false)
      */
-    private static boolean checkTests(Client newClient) {
+    private static boolean isNewClient(Client newClient) {
 
         //for each previously entered client
         for (Client otherClient : clients) {
 
             //if the clients match
-            if (checkTest1(newClient, otherClient)) {
+            if (isMatch1(newClient, otherClient)) {
                 // Add newClient to an ArrayList for the main client
                 try {
                     //add new client to list of duplicates of old client
@@ -187,7 +194,7 @@ public class Algorithm1 {
                 return false;
             }
 
-            if (checkTest2(newClient, otherClient)) {
+            if (isMatch2(newClient, otherClient)) {
                 // Same thing as before
                 try {
                     map.get(otherClient).add(newClient);
@@ -204,8 +211,49 @@ public class Algorithm1 {
         return true;
     }
 
-    private static boolean checkTest2(Client newClient, Client client) {
+    /**
+     * Run test 1
+     *
+     *
+     *
+     * @return true if a match is detected false if not
+     *
+     */
+    private static boolean isMatch1(Client newClient, Client client) {
 
+        //if SSNs are NOT, equal and valid values
+        //then there is no match (test 1)
+        if (!hasSsnMatch(newClient.getSsn(), client)) {
+            return false;
+        }
+
+        //ssns must be full-reports
+        String newClientSsnDataQuality = newClient.getSsnDataQuality();
+        String clientSsnDataQuality = client.getSsnDataQuality();
+
+        //if either client has incomplete ssn
+        //then there is no match (test 1)
+        if (!isFullSsn(newClientSsnDataQuality) || !isFullSsn(clientSsnDataQuality)) {
+            return false;
+        }
+
+        //ssns are complete and equal
+        //now check for at least two matches
+        String[] client1Info = {newClient.getfName(), newClient.getlName(), newClient.getDobS()};
+        String[] client2Info = {client.getfName(), client.getlName(), client.getDobS()};
+
+        int equalCount = countOfEqual(client1Info, client2Info);
+        if (equalCount >= 2) {
+            matchingClients.put(newClient.getPersonalId(), client.getPersonalId());
+            return true;
+        }
+
+        // no match
+        return false;
+
+    }//END isMatch1
+
+    private static boolean isMatch2(Client newClient, Client client) {
         //
         //
         // First set of criteria
@@ -224,25 +272,22 @@ public class Algorithm1 {
         //ssn equality test
         //stepA is true if ssns are complete and matching
         boolean stepA = false;
-        if (checkSsn(ssn, client)) {
+        if (hasSsnMatch(ssn, client)) {
+
             String clientSsnDataQuality = client.getSsnDataQuality();
 
-            //if both ssn data qualities are non-empty
-            if (!ssnDataQuality.isEmpty() && !clientSsnDataQuality.isEmpty()) {
-
-                //if both ssns are complete
-                if (checkSsnDataQuality(ssnDataQuality) && checkSsnDataQuality(clientSsnDataQuality)) {
-                    stepA = true;
-                }
+            //if both ssns are complete
+            if (isFullSsn(ssnDataQuality) && isFullSsn(clientSsnDataQuality)) {
+                stepA = true;
             }
 
         }
 
-        // How equal are they? Same person if >= 2 by the algorithm
-        int equalCount = countOfEqual(client1Info, client2Info);
+        // How equal are they? Has potential if at least two fields match
+        boolean stepB = countOfEqual(client1Info, client2Info) >= 2;
 
         //if first set fails to find a match
-        if (!(stepA || equalCount <= client1Info.length - 2)) {
+        if (!(stepA || stepB)) {
             return false;
         }
 
@@ -255,18 +300,27 @@ public class Algorithm1 {
         String suffix = newClient.getSuffix();
         LocalDate dob = newClient.getDob();
 
-        client1Info = new String[]{gender, suffix, String.valueOf(dob.getDayOfMonth()),
-            String.valueOf(dob.getMonthValue()), String.valueOf(dob.getYear())};
+        client1Info = new String[]{
+            gender,
+            suffix,
+            String.valueOf(dob.getDayOfMonth()),
+            String.valueOf(dob.getMonthValue()),
+            String.valueOf(dob.getYear())
+        };
 
         LocalDate client2Dob = client.getDob();
-        client2Info = new String[]{client.getGender(), client.getSuffix(),
-            String.valueOf(client2Dob.getDayOfMonth()), String.valueOf(client2Dob.getMonthValue()),
-            String.valueOf(client2Dob.getYear())};
+        client2Info = new String[]{
+            client.getGender(),
+            client.getSuffix(),
+            String.valueOf(client2Dob.getDayOfMonth()),
+            String.valueOf(client2Dob.getMonthValue()),
+            String.valueOf(client2Dob.getYear())
+        };
 
-        int equalCount2 = countOfEqual(client1Info, client2Info);
+        int inequalCount = countOfInequal(client1Info, client2Info);
 
         // if Second set of criteria fails
-        if ((equalCount2 <= client1Info.length - 2) && !stepA) {
+        if (inequalCount >= 2) {
             return false;
         }
 
@@ -297,57 +351,16 @@ public class Algorithm1 {
     }
 
     /**
-     * Run test 1
-     *
-     *
-     *
-     * @return true if a match is detected false if not
-     *
-     */
-    private static boolean checkTest1(Client newClient, Client client) {
-
-        // if SSNs are equal
-        if (checkSsn(newClient.getSsn(), client)) {
-            String newClientSsnDataQuality = newClient.getSsnDataQuality();
-            String clientSsnDataQuality = client.getSsnDataQuality();
-
-            //if both clients have non-empty ssn data quality
-            if (!newClientSsnDataQuality.isEmpty() && !clientSsnDataQuality.isEmpty()) {
-
-                //if either client has incomplete ssn
-                if (!checkSsnDataQuality(newClientSsnDataQuality) || !checkSsnDataQuality(clientSsnDataQuality)) {
-                    return false;
-                }
-
-            }
-
-        }
-
-        //ssns are complete and equal, now check for at least two matches
-        String[] client1Info = {newClient.getfName(), newClient.getlName(), newClient.getDobS()};
-        String[] client2Info = {client.getfName(), client.getlName(), client.getDobS()};
-
-        int equalCount = countOfEqual(client1Info, client2Info);
-        if (equalCount >= 2) {
-            matchingClients.put(newClient.getPersonalId(), client.getPersonalId());
-            return true;
-        }
-
-        // no match
-        return false;
-    }
-
-    /**
      * If SSNs are equal and SSN is not garbage based on spec
      */
-    private static boolean checkSsn(String ssn, Client client) {
-        return client.getSsn().equals(ssn) && (!"999999999".equals(ssn) && !"000000000".equals(ssn) && !ssn.isEmpty());
+    private static boolean hasSsnMatch(String ssn, Client client) {
+        return client.getSsn().equals(ssn) && !"999999999".equals(ssn) && !"000000000".equals(ssn) && !ssn.isEmpty();
     }
 
     /**
      * If SsnDataQuality is good based on algorithm
      */
-    private static boolean checkSsnDataQuality(String ssnDataQuality) {
+    private static boolean isFullSsn(String ssnDataQuality) {
         return "1".equals(ssnDataQuality);
     }
 
@@ -365,13 +378,33 @@ public class Algorithm1 {
 
         return count;
     }
-    
-    
+
+    /**
+     * Count how many times items in array are not equal client1Info[i] ==
+     * client2Info[i]
+     *
+     * If one field is blank, then there are no conflicts
+     */
+    private static int countOfInequal(String[] client1Info, String[] client2Info) {
+        int count = 0;
+        for (int i = 0; i < client1Info.length; i++) {
+            if (!client1Info[i].equals(client2Info[i])
+                    && !client1Info[i].isEmpty()
+                    && !client2Info[i].isEmpty()) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
     /**
      * Get entry dates for everyone mapping PID to the date of entry
      */
-    private static HashMap<String, LocalDate> getEntriesDates() {
-        HashMap<String, LocalDate> map = new HashMap<>();
+    private static void getEntriesDates() {
+        //HashMap<String, LocalDate> map = new HashMap<>();
+
+        boolean flag = true;
 
         Scanner sc = null;
         try {
@@ -381,15 +414,23 @@ public class Algorithm1 {
         }
         sc = sc.useDelimiter("[,\n]");
         sc.nextLine();
+
+        int count = 0;
+
         while (sc.hasNextLine()) {
-            String projectEntry = sc.next();
-            if (projectEntry.isEmpty()) {
+
+            String line = sc.nextLine();
+            String[] array = line.split(",");
+
+            if (array.length == 0) {
                 break;
             }
 
-            String personalId = sc.next();
-            sc.next();
-            String entryDateS = sc.next();
+            String projectEntry = array[0];
+
+            String personalId = array[1];
+           
+            String entryDateS = array[3];
 
             LocalDate entryDate;
             try {
@@ -398,12 +439,13 @@ public class Algorithm1 {
                 entryDate = LocalDate.parse(entryDateS, NEW_DATE_FORMAT);
             }
 
-            map.put(personalId, entryDate);
+            ENTRY_DATES.put(personalId, entryDate);
 
-            sc.nextLine();
         }
 
-        return map;
+        sc.close();
+
+        //return map;
     }
 
     /**
