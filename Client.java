@@ -30,7 +30,7 @@ public class Client {
     
     
     //client relation to other clients
-    private Set<Client> similarClients = new HashSet<>();
+    //private Set<Client> similarClients = new HashSet<>();
     
     
     public Client(String personalId, String fName, String lName, String suffix, String nameDataQuality, String ssn,
