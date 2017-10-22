@@ -38,7 +38,7 @@ public class Algorithm1 {
             = DateTimeFormatter.ofPattern("yyyy-M-d");
 
     /**
-     * a map of string representations of dates, to date objects
+     * maps personal ids to dates of entry
      */
     private static final HashMap<String, LocalDate> ENTRY_DATES = new HashMap<>();
 
@@ -65,6 +65,17 @@ public class Algorithm1 {
      * maps an original client to a list of matching clients
      */
     private static HashMap<Client, ArrayList<Client>> map = new HashMap<>();
+
+    /**
+     * frequency array for groups of singles(0), twins(1), triplets(2), ...
+     */
+    private static int[] multFreqs = new int[10];
+    private static int test1MultCount = 0, test2MultCount = 0;
+
+    /**
+     * if true, then skip DisabilitiesOutput.csv
+     */
+    private static final boolean NO_DIS = false;
 
     /**
      * Reads the client.csv file De-duplicates entries Writes the new list of
@@ -156,15 +167,20 @@ public class Algorithm1 {
             if (filename.endsWith(".csv")) {
                 String noExtension = filename.substring(0, filename.indexOf(".csv"));
                 // A CSV provided by HUD
-                if (!noExtension.endsWith("Output")) {
-                    System.out.println("Writing to " + filename + "Output ...");
-                    changePersonalIds(filename);
-                    System.out.println("Wrote to " + filename + "Output");
+                if (!NO_DIS || !filename.equals("Disabilities.csv")) {
+                    if (!noExtension.endsWith("Output")) {
+                        System.out.println("Writing to " + noExtension + "Output.csv ...");
+                        changePersonalIds(filename);
+                        System.out.println("Wrote to " + noExtension + "Output.csv");
+                    }
                 }
             }
         }
 
         System.out.println("COUNT OF UNIQUE CLIENTS = " + clients.size());
+        for (int i = 0; i < multFreqs.length; i++) {
+            System.out.println("Multiples of " + (i + 1) + " = " + multFreqs[i]);
+        }
 
     }//end main
 
@@ -182,31 +198,28 @@ public class Algorithm1 {
 
             //if the clients match
             if (isMatch1(newClient, otherClient)) {
+
                 // Add newClient to an ArrayList for the main client
-                try {
-                    //add new client to list of duplicates of old client
-                    map.get(otherClient).add(newClient);
-                } catch (NullPointerException e) {
-                    ArrayList<Client> list = new ArrayList<>();
-                    list.add(newClient);
-                    map.put(otherClient, list);
+                if (map.get(otherClient) == null) {
+                    map.put(otherClient, new ArrayList<>());
                 }
+                map.get(otherClient).add(newClient);
+
                 return false;
             }
 
             if (isMatch2(newClient, otherClient)) {
+
                 // Same thing as before
-                try {
-                    map.get(otherClient).add(newClient);
-                } catch (NullPointerException e) {
-                    ArrayList<Client> list = new ArrayList<>();
-                    list.add(newClient);
-                    map.put(otherClient, list);
+                if (map.get(otherClient) == null) {
+                    map.put(otherClient, new ArrayList<>());
                 }
+                map.get(otherClient).add(newClient);
+
                 return false;
             }
 
-        }
+        }//end prev client loop
 
         return true;
     }
@@ -239,24 +252,57 @@ public class Algorithm1 {
 
         //ssns are complete and equal
         //now check for at least two matches
-        String[] client1Info = {newClient.getfName(), newClient.getlName(), newClient.getDobS()};
-        String[] client2Info = {client.getfName(), client.getlName(), client.getDobS()};
+        String[] newClientInfo = new String[]{newClient.getfName(), newClient.getlName(), newClient.getDobS()};
+        String[] clientInfo = new String[]{client.getfName(), client.getlName(), client.getDobS()};
 
-        int equalCount = countOfEqual(client1Info, client2Info);
-        if (equalCount >= 2) {
-            matchingClients.put(newClient.getPersonalId(), client.getPersonalId());
-            return true;
+        int equalCount = countOfEqual(newClientInfo, clientInfo);
+        if (equalCount < 2) {
+            return false;
         }
 
-        // no match
-        return false;
+        //
+        //
+        // TWIN CHECK for isMatch1
+        //
+        //
+        // Same birthdays and last names
+        if (newClientInfo[1].equals(client.getlName()) && newClient.getDob().equals(client.getDob())) {
+            // Different SSNs
+            ////////if (!newClient.getSsn().equals(client.getSsn())) {
+                LocalDate entryDate = ENTRY_DATES.get(newClient.getPersonalId());
+                // Age < 18
+                if (newClient.getDob().isBefore(entryDate.minusYears(18))) {
+                    String client2FName = client.getfName();
+                    // Different first names
+                    if (!newClientInfo[0].isEmpty() && !client2FName.isEmpty()
+                            && !newClientInfo[0].equals(client2FName)) {
+
+                        //twins have been found
+                        //update count and twin status accordingly
+                        multFreqs[client.numMultiples.val]--;
+                        client.numMultiples.val++;
+                        newClient.numMultiples = client.numMultiples;
+                        multFreqs[client.numMultiples.val]++;
+
+                        test1MultCount++;
+                        //System.out.println("TWIN 1");
+                        
+                        return false;
+                    }
+                }
+            ////////}
+        }
+
+        //clients did not fail any of the match criteria
+        matchingClients.put(newClient.getPersonalId(), client.getPersonalId());
+        return true;
 
     }//END isMatch1
 
     private static boolean isMatch2(Client newClient, Client client) {
         //
         //
-        // First set of criteria
+        // First set of criteria (look for matching)
         //
         //
         String fName = newClient.getfName();
@@ -293,40 +339,43 @@ public class Algorithm1 {
 
         //
         //
-        // Second set of criteria
+        // Second set of criteria (look for distinctions)
         //
         //
         String gender = newClient.getGender();
         String suffix = newClient.getSuffix();
         LocalDate dob = newClient.getDob();
 
-        client1Info = new String[]{
-            gender,
-            suffix,
-            String.valueOf(dob.getDayOfMonth()),
-            String.valueOf(dob.getMonthValue()),
-            String.valueOf(dob.getYear())
-        };
+        //success for stepA AND stepB indicates a HARD MATCH
+        //only look for distinctions if we dont have a HARD MATCH
+        if (!(stepA && stepB)) {
 
-        LocalDate client2Dob = client.getDob();
-        client2Info = new String[]{
-            client.getGender(),
-            client.getSuffix(),
-            String.valueOf(client2Dob.getDayOfMonth()),
-            String.valueOf(client2Dob.getMonthValue()),
-            String.valueOf(client2Dob.getYear())
-        };
+            client1Info = new String[]{
+                gender,
+                suffix,
+                String.valueOf(dob.getDayOfMonth()),
+                String.valueOf(dob.getMonthValue()),
+                String.valueOf(dob.getYear())
+            };
 
-        int inequalCount = countOfInequal(client1Info, client2Info);
+            LocalDate client2Dob = client.getDob();
+            client2Info = new String[]{
+                client.getGender(),
+                client.getSuffix(),
+                String.valueOf(client2Dob.getDayOfMonth()),
+                String.valueOf(client2Dob.getMonthValue()),
+                String.valueOf(client2Dob.getYear())
+            };
 
-        // if Second set of criteria fails
-        if (inequalCount >= 2) {
-            return false;
+            if (countOfInequal(client1Info, client2Info) >= 2) {
+                return false;
+            }
+
         }
 
         //
         //
-        // Third set of criteria
+        // Third set of criteria (TWIN CHECK)
         //
         //
         // Same birthdays and last names
@@ -339,6 +388,17 @@ public class Algorithm1 {
                     String client2FName = client.getfName();
                     // Different first names
                     if (!fName.isEmpty() && !client2FName.isEmpty() && !fName.equals(client2FName)) {
+
+                        //twins have been found
+                        //update count and twin status accordingly
+                        multFreqs[client.numMultiples.val]--;
+                        client.numMultiples.val++;
+                        newClient.numMultiples = client.numMultiples;
+                        multFreqs[client.numMultiples.val]++;
+
+                        test2MultCount++;
+                        //System.out.println("TWIN 2");
+
                         return false;
                     }
                 }
@@ -354,7 +414,8 @@ public class Algorithm1 {
      * If SSNs are equal and SSN is not garbage based on spec
      */
     private static boolean hasSsnMatch(String ssn, Client client) {
-        return client.getSsn().equals(ssn) && !"999999999".equals(ssn) && !"000000000".equals(ssn) && !ssn.isEmpty();
+        return client.getSsn().equals(ssn) && !"999999999".equals(ssn)
+                && !"000000000".equals(ssn) && !ssn.isEmpty();
     }
 
     /**
@@ -429,7 +490,7 @@ public class Algorithm1 {
             String projectEntry = array[0];
 
             String personalId = array[1];
-           
+
             String entryDateS = array[3];
 
             LocalDate entryDate;
@@ -458,7 +519,8 @@ public class Algorithm1 {
         }
     }
 
-    private static void changePersonalIds(String filename) throws FileNotFoundException, UnsupportedEncodingException {
+    private static void changePersonalIds(String filename)
+            throws FileNotFoundException, UnsupportedEncodingException {
         Scanner sc = new Scanner(new File(filename), "UTF-8");
         sc = sc.useDelimiter("[,\n]");
 

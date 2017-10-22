@@ -28,6 +28,15 @@ public class Client {
     
     private String line;
     
+    protected class IntNode{
+        protected int val;
+        protected IntNode(int v){
+            val = v;
+        }       
+    }
+    
+    /** the number of other clients who are multiples with this client */
+    public IntNode numMultiples = new IntNode(0);
     
     //client relation to other clients
     //private Set<Client> similarClients = new HashSet<>();
