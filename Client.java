@@ -8,42 +8,49 @@ import java.util.*;
  */
 public class Client {
 
+    private Object[] allFields;
+
     //client's data
     private String personalId;
+    private String newPersonalId;
+
     private String fName;
     private String lName;
     private String suffix;
     private String nameDataQuality;
-    
+
     private String ssn;
     private String ssnDataQuality;
-    
+
     private String dobS;
     private LocalDate dob;
     private String dobDataQuality;
-    
+
     private String gender;
-    
-    private String newPersonalId;
-    
+
     private String line;
-    
-    protected class IntNode{
+
+    protected class IntNode {
+
         protected int val;
-        protected IntNode(int v){
+
+        protected IntNode(int v) {
             val = v;
-        }       
+        }
     }
-    
-    /** the number of other clients who are multiples with this client */
+
+    /**
+     * the number of other clients who are multiples with this client
+     */
     public IntNode numMultiples = new IntNode(0);
-    
+
     //client relation to other clients
     //private Set<Client> similarClients = new HashSet<>();
-    
-    
-    public Client(String personalId, String fName, String lName, String suffix, String nameDataQuality, String ssn,
-                  String ssnDataQuality, String dobS, LocalDate dob, String dobDataQuality, String gender, String line){
+    public Client(
+            String personalId, String fName, String lName, String suffix, String nameDataQuality, String ssn,
+            String ssnDataQuality, String dobS, LocalDate dob, String dobDataQuality, String gender, String line,
+            String[] allFields
+    ) {
         this.personalId = personalId;
         this.fName = fName;
         this.lName = lName;
@@ -56,58 +63,63 @@ public class Client {
         this.dobDataQuality = dobDataQuality;
         this.gender = gender;
         this.line = line;
+        this.allFields = allFields;
     }
-    
-    public String getLine(){
+
+    public String getLine() {
         return line;
     }
-    
-    public String getPersonalId(){
+
+    public String getPersonalId() {
         return personalId;
     }
-    
-    public void setNewPersonalId(String newPersonalId){
+
+    public void setNewPersonalId(String newPersonalId) {
         this.newPersonalId = newPersonalId;
     }
-    
-    public String getfName(){
+
+    public String getfName() {
         return fName;
     }
-    
-    public String getlName(){
+
+    public String getlName() {
         return lName;
     }
-    
-    public String getSuffix(){
+
+    public String getSuffix() {
         return suffix;
     }
-    
-    public String getNameDataQuality(){
+
+    public String getNameDataQuality() {
         return nameDataQuality;
     }
-    
-    public String getSsn(){
+
+    public String getSsn() {
         return ssn;
     }
-    
-    public String getSsnDataQuality(){
+
+    public String getSsnDataQuality() {
         return ssnDataQuality;
     }
-    
-    public String getDobS(){
+
+    public String getDobS() {
         return dobS;
     }
-    
-    public LocalDate getDob(){
+
+    public LocalDate getDob() {
         return dob;
     }
-    
-    public String getDobDataQuality(){
+
+    public String getDobDataQuality() {
         return dobDataQuality;
     }
-    
-    public String getGender(){
+
+    public String getGender() {
         return gender;
+    }
+
+    public Object[] getAllFields(){
+        return allFields;
     }
     
     /**
@@ -116,14 +128,14 @@ public class Client {
      * @return
      */
     @Override
-    public String toString(){
+    public String toString() {
         StringBuilder sb = new StringBuilder(200);
         sb = sb.append(personalId).append(',').append(fName).append(',')
                 .append(lName).append(',').append(suffix).append(',')
                 .append(nameDataQuality).append(',').append(ssn).append(',')
                 .append(ssnDataQuality).append(',').append(dob).append(',')
                 .append(dobDataQuality).append(',').append(gender).append(',');
-        
+
         return sb.toString();
     }
 }

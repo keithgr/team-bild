@@ -13,13 +13,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Main program
+ * Data program
  *
- * @author Hamza Memon, Keith Grable
- * @version 2017-10-04
+ * @author Keith Grable
+ * @version 2017-10-31
  */
-public class Algorithm1 {
-
+public class DataAnalysis {
+    
     private static final String INPUT_PATH = "./";
 
     //
@@ -51,9 +51,9 @@ public class Algorithm1 {
     //CLIENT MATCHING VARS
     //
     /**
-     * dynamic list of unique clients
+     * dynamic list of ALL entries
      */
-    private static ArrayList<Client> clients = new ArrayList<>();
+    private static ArrayList<Client> entries = new ArrayList<>();
 
     /**
      * maps personal ids that represent duplicate entries, according to our
@@ -67,38 +67,53 @@ public class Algorithm1 {
     private static HashMap<Client, ArrayList<Client>> map = new HashMap<>();
 
     /**
-     * Maps SSN to a list of clients with that SSN Lists the groups of clients
-     */
-    private static HashMap<String, ArrayList<Client>> ssnGroupMap = new HashMap<>();
-    private static ArrayList<ArrayList<Client>> ssnGroupList = new ArrayList<>();
-
-    /**
      * frequency array for groups of singles(0), twins(1), triplets(2), ...
      */
     private static int[] multFreqs = new int[1000];
     private static int test1MultCount = 0, test2MultCount = 0;
 
-    /**
-     * if false, then skip writing to output
-     */
-    private static final boolean WRITE = true;
-
     //
     // VARS FOR FEATURE ACCURACY
     //
     /**
-     * isMatch1 is assumed to be accurate
-     *
-     * [0] both matches fail [1] match1 succeeds, match2 fails (false negative)
-     * [2] match1 fails, match2 succeeds (false positive) [3] both matches
-     * succeed
+     * Maps SSN to a list of clients with that SSN Lists the groups of clients
      */
-    private static long[] test2Acc = new long[4];
-    private static long totalMatchCount = 0;
+    private static HashMap<String, HashSet<Client>> ssnGroupMap = new HashMap<>();
+    private static HashMap<String, HashSet<Client>> fNameGroupMap = new HashMap<>();
+    private static HashMap<String, HashSet<Client>> lNameGroupMap = new HashMap<>();
+    private static HashMap<LocalDate, HashSet<Client>> dobGroupMap = new HashMap<>();
 
     /**
-     * Reads the client.csv file De-duplicates entries Writes the new list of
-     * entries to an output file
+     * Arrays to count frequency of field matches for various groups
+     */
+    //array of inividual fields to be compared
+    private static String[] matchTypes = {
+        "SSN", "FName", "LName", "Suffix",
+        "DoB", "Day", "Month", "Year",
+        "Gender",
+        "Pass2"
+    };
+
+    //array of groups to compare within
+    private static String[] groupTypes = {
+        "SSN", "FName", "LName", "DoB", "Fail1"
+    };
+
+    //for each group
+    //a frequency array for matches in each field
+    private static long[][] matchFreqs = new long[groupTypes.length][matchTypes.length];
+
+    //for each group
+    //the total number of comparisons made per field
+    private static long[] compFreqs = new long[groupTypes.length];
+
+    //turning on DEBUG will cause data analysis to run through a small sample (1000)
+    //of entries to get a quick result
+    private static final boolean DEBUG = true;
+
+    /**
+     * Reads the client.csv file, gathering data about matches
+     *
      *
      * @throws java.io.FileNotFoundException
      * @throws java.io.UnsupportedEncodingException
@@ -118,13 +133,16 @@ public class Algorithm1 {
 
         // column header
         String headers = sc.nextLine();
-        StringBuilder sb = new StringBuilder(200 * 100_000);
+        StringBuilder sb = new StringBuilder();
         sb = sb.append(headers).append('\n');
 
-        System.out.println("DEDUPLICATING ...");
+        System.out.println("READING ENTRIES ...");
+
+        //for DEBUG
+        int scanCount = 0;
 
         //for each entry
-        while (sc.hasNextLine()) {
+        while (sc.hasNextLine() && !(DEBUG && scanCount > 2000)) {
 
             String line = sc.nextLine();
             String[] array = line.split(",");
@@ -166,116 +184,188 @@ public class Algorithm1 {
                         dobS, dob, dobDataQuality, gender, line, array
                 );
 
-                /*
-                 //map clients SSN to the client object
-                 ArrayList<Client> group = ssnGroupMap.get(ssn);
-                 if (group == null) {
-                 group = new ArrayList<>();
-                 ssnGroupMap.put(ssn, group);
-                 }
-                 group.add(client);
-                 */
-                //if client is new, then add client to dynamic list
-                boolean isNew = isNewClient(client);
-                if (isNew) {
-                    clients.add(client);
+                //map client's data to congruence classes
+                if (isFullSsn(client)) {
+                    mapSsn(client);
                 }
+                mapFName(client);
+                mapLName(client);
+                mapDob(client);
 
+                //add entry to list
+                entries.add(client);
+
+                scanCount++;
             }//end special date condition
 
-        }//END WHILE
-
+        }//END SCANNING
         sc.close();
 
-        if (WRITE) {
-
-            System.out.println("WRITING OUTPUT FILES ...");
-                    // A CSV provided by HUD
-
-            // Get all other files
-            File[] files = new File(INPUT_PATH).listFiles();
-            for (File file : files) {
-                String filename = file.getName();
-                // Get all CSVs
-                if (filename.endsWith(".csv")) {
-                    String noExtension = filename.substring(0, filename.indexOf(".csv"));
-                    // A CSV provided by HUD
-                    
-                        if (!noExtension.endsWith("Output")) {
-                            System.out.println("Writing to " + noExtension + "Output.csv ...");
-                            changePersonalIds(filename);
-                            System.out.println("Wrote to " + noExtension + "Output.csv");
-                        }
-        
-                }
-            }//end file loop
-
+        //BEGIN ANALYSIS
+        //
+        //for each entry
+        for (int e = 0; e < entries.size(); e++) {
+            gatherData(entries.get(e), e + 1);
         }
 
-        /*
-         System.out.println("COUNT OF UNIQUE CLIENTS = " + clients.size());
-         for (int i = 0; i < multFreqs.length; i++) {
-         System.out.println("Multiples of " + (i + 1) + " = " + multFreqs[i]);
-         }
-         */
-        /*
-         System.out.println("FAIL-FAIL: " + test2Acc[0]);
-         System.out.println("PASS-FAIL (false neg): " + test2Acc[1]);
-         System.out.println("FAIL-PASS (false pos): " + test2Acc[2]);
-         System.out.println("PASS-PASS: " + test2Acc[3]);
-         System.out.println("TOTAL MATCHES: " + totalMatchCount);
-         */
+        //DISPLAY RESULTS
+        //
+        //matchType labels
+        System.out.print("\t");
+        for (int m = 0; m < matchTypes.length; m++) {
+            System.out.print(matchTypes[m] + "\t");
+        }
+        System.out.println("| CompFreqs");
+
+        for (int g = 0; g < groupTypes.length; g++) {
+            System.out.print(groupTypes[g] + "\t");
+            for (int m = 0; m < matchTypes.length; m++) {
+                System.out.print(matchFreqs[g][m] + "\t");
+            }
+            System.out.println("|  " + compFreqs[g]);
+        }
     }//end main
 
-    /**
-     * Run the algorithm
-     *
-     * @param newClient the current line of the file
-     *
-     * @return if newClient is new (true) or not (false)
-     */
-    private static boolean isNewClient(Client newClient) {
+    //
+    //
+    // MAPPING METHODS
+    //
+    //
+    private static void mapSsn(Client entry) {
+        String ssn = entry.getSsn();
+        HashSet<Client> group = ssnGroupMap.get(ssn);
+        if (group == null) {
+            group = new HashSet<>();
+            ssnGroupMap.put(ssn, group);
+        }
+        group.add(entry);
+    }
 
-        //for each previously entered client
-        for (Client otherClient : clients) {
+    private static void mapFName(Client entry) {
+        String fName = entry.getfName();
+        HashSet<Client> group = fNameGroupMap.get(fName);
+        if (group == null) {
+            group = new HashSet<>();
+            fNameGroupMap.put(fName, group);
+        }
+        group.add(entry);
+    }
 
-            //if the clients match
-            if (isMatch1(newClient, otherClient)) {
+    private static void mapLName(Client entry) {
+        String lName = entry.getlName();
+        HashSet<Client> group = lNameGroupMap.get(lName);
+        if (group == null) {
+            group = new HashSet<>();
+            lNameGroupMap.put(lName, group);
+        }
+        group.add(entry);
+    }
 
-                //clients did not fail any of the match criteria
-                matchingClients.put(newClient.getPersonalId(), otherClient.getPersonalId());
+    private static void mapDob(Client entry) {
+        LocalDate dob = entry.getDob();
+        HashSet<Client> group = dobGroupMap.get(dob);
+        if (group == null) {
+            group = new HashSet<>();
+            dobGroupMap.put(dob, group);
+        }
+        group.add(entry);
+    }
 
-                // Add newClient to an ArrayList for the main client
-                ArrayList<Client> temp = map.get(otherClient);
-                if (temp == null) {
-                    temp = new ArrayList<>();
-                    map.put(otherClient, temp);
+    //
+    //
+    // DATA COLLECTING METHODS
+    //
+    //
+    private static void gatherData(Client entry, int start) {
+
+        try {
+            //compare data fields for entries with matching SSNs
+            for (Client otherEntry : ssnGroupMap.get(entry.getSsn())) {
+                if (entry != otherEntry) {
+                    compareFields(entry, otherEntry, 0);
                 }
-                temp.add(newClient);
-
-                return false;
             }
+        } catch (NullPointerException e) {
+            //System.out.println("SSSSSSSSSSSSSSSSSSSSSSN");
+        }
 
-            if (isMatch2(newClient, otherClient)) {
-
-                // Link the main client's PID to the Client
-                matchingClients.put(newClient.getPersonalId(), otherClient.getPersonalId());
-
-                // Same thing as before
-                ArrayList<Client> temp = map.get(otherClient);
-                if (temp == null) {
-                    temp = new ArrayList<>();
-                    map.put(otherClient, temp);
+        try {
+            //compare data fields for entries with matching FirstNames
+            for (Client otherEntry : fNameGroupMap.get(entry.getfName())) {
+                if (entry != otherEntry) {
+                    compareFields(entry, otherEntry, 1);
                 }
-                temp.add(newClient);
-
-                return false;
-
             }
+        } catch (NullPointerException e) {
+            //System.out.println("FFFFFFFFFFFFFFFFFFFFN");
+        }
 
-        }//end prev client loop
+        try {
+            //compare data fields for entries with matching LastNames
+            for (Client otherEntry : lNameGroupMap.get(entry.getlName())) {
+                if (entry != otherEntry) {
+                    compareFields(entry, otherEntry, 2);
+                }
+            }
+        } catch (NullPointerException e) {
+            //System.out.println("LLLLLLLLLLLLLLLLLLLN");
+        }
 
-        return true;
+        try {
+            //compare data fields for entries with matching DoBs
+            for (Client otherEntry : dobGroupMap.get(entry.getDob())) {
+                if (entry != otherEntry) {
+                    compareFields(entry, otherEntry, 3);
+                }
+            }
+        } catch (NullPointerException e) {
+            //System.out.println("DDDDDDDDDDDDDDDDDDDDOOOOOOOOOOOOOOOBBBBBBBBB");
+        }
+
+        //compare data fields for all successive entries that fail test1 [4]
+        for (int oe = start; oe < entries.size(); oe++) {
+            Client otherEntry = entries.get(oe);
+            if (!isMatch1(entry, otherEntry)) {
+                compareFields(entry, otherEntry, 4);
+            }
+        }
+
+    }//end gatherData
+
+    private static void compareFields(Client entry, Client otherEntry, int groupId) {
+        if (hasSsnMatch(entry.getSsn(), otherEntry)) {
+            matchFreqs[groupId][0]++;
+        }
+        if (entry.getfName().equals(otherEntry.getfName()) && !entry.getfName().isEmpty()) {
+            matchFreqs[groupId][1]++;
+        }
+        if (entry.getlName().equals(otherEntry.getlName()) && !entry.getlName().isEmpty()) {
+            matchFreqs[groupId][2]++;
+        }
+        if (!entry.getSuffix().isEmpty() && entry.getSuffix().equals(otherEntry.getSuffix())) {
+            matchFreqs[groupId][3]++;
+        }
+        LocalDate dob = entry.getDob(), otherDob = otherEntry.getDob();
+        if (dob.equals(otherDob)) {
+            matchFreqs[groupId][4]++;
+        }
+        if (dob.getDayOfMonth() == otherDob.getDayOfMonth()) {
+            matchFreqs[groupId][5]++;
+        }
+        if (dob.getMonthValue() == otherDob.getMonthValue()) {
+            matchFreqs[groupId][6]++;
+        }
+        if (dob.getYear() == otherDob.getYear()) {
+            matchFreqs[groupId][7]++;
+        }
+        if (entry.getGender().equals(otherEntry.getGender())) {
+            matchFreqs[groupId][8]++;
+        }
+        if (isMatch2(entry, otherEntry)) {
+            matchFreqs[groupId][9]++;
+        }
+
+        compFreqs[groupId]++;
     }
 
     /**
@@ -286,7 +376,7 @@ public class Algorithm1 {
      * @return true if a match is detected false if not
      *
      */
-    static boolean isMatch1(Client newClient, Client client) {
+    private static boolean isMatch1(Client newClient, Client client) {
 
         //if SSNs are NOT: equal, full, and valid values
         //then there is no match (test 1)
@@ -321,16 +411,17 @@ public class Algorithm1 {
                 if (!newClientInfo[0].isEmpty() && !client2FName.isEmpty()
                         && !newClientInfo[0].equals(client2FName)) {
 
-                    //twins have been found
-                    //update count and twin status accordingly
-                    multFreqs[client.numMultiples.val]--;
-                    client.numMultiples.val++;
-                    newClient.numMultiples = client.numMultiples;
-                    multFreqs[client.numMultiples.val]++;
+                    /*
+                     //twins have been found
+                     //update count and twin status accordingly
+                     multFreqs[client.numMultiples.val]--;
+                     client.numMultiples.val++;
+                     newClient.numMultiples = client.numMultiples;
+                     multFreqs[client.numMultiples.val]++;
 
-                    test1MultCount++;
-                    //System.out.println("TWIN 1");
-
+                     test1MultCount++;
+                     //System.out.println("TWIN 1");
+                     */
                     return false;
                 }
             }
@@ -339,7 +430,7 @@ public class Algorithm1 {
 
     }//END isMatch1
 
-    static boolean isMatch2(Client newClient, Client client) {
+    private static boolean isMatch2(Client newClient, Client client) {
         //
         //
         // First set of criteria (look for matching)
@@ -363,7 +454,7 @@ public class Algorithm1 {
             String clientSsnDataQuality = client.getSsnDataQuality();
 
             //if both ssns are complete
-            if (isFullSsn(ssnDataQuality) && isFullSsn(clientSsnDataQuality)) {
+            if (isFullSsn(newClient) && isFullSsn(client)) {
                 stepA = true;
             }
 
@@ -429,16 +520,17 @@ public class Algorithm1 {
                     // Different first names
                     if (!fName.isEmpty() && !client2FName.isEmpty() && !fName.equals(client2FName)) {
 
-                        //twins have been found
-                        //update count and twin status accordingly
-                        multFreqs[client.numMultiples.val]--;
-                        client.numMultiples.val++;
-                        newClient.numMultiples = client.numMultiples;
-                        multFreqs[client.numMultiples.val]++;
+                        /*
+                         //twins have been found
+                         //update count and twin status accordingly
+                         multFreqs[client.numMultiples.val]--;
+                         client.numMultiples.val++;
+                         newClient.numMultiples = client.numMultiples;
+                         multFreqs[client.numMultiples.val]++;
 
-                        test2MultCount++;
-                        //System.out.println("TWIN 2");
-
+                         test2MultCount++;
+                         //System.out.println("TWIN 2");
+                         */
                         return false;
                     }
                 }
@@ -452,17 +544,18 @@ public class Algorithm1 {
      * If SSNs are equal and SSN is not garbage based on spec
      */
     private static boolean hasSsnMatch(String ssn, Client client) {
-        return client.getSsn().equals(ssn) //codes are equal
-                && "1".equals(ssn) //ssns are full
-                && !"999999999".equals(ssn) //ssns are valid numbers
-                && !"000000000".equals(ssn);
+        return client.getSsn().equals(ssn) && !"999999999".equals(ssn)
+                && !"000000000".equals(ssn) && !ssn.isEmpty();
     }
 
     /**
      * If SsnDataQuality is good based on algorithm
      */
-    private static boolean isFullSsn(String ssnDataQuality) {
-        return "1".equals(ssnDataQuality);
+    private static boolean isFullSsn(Client client) {
+        return "1".equals(client.getSsnDataQuality())
+                && !"999999999".equals(client.getSsn())
+                && !"000000000".equals(client.getSsn())
+                && !client.getSsn().isEmpty();
     }
 
     /**
@@ -548,66 +641,5 @@ public class Algorithm1 {
 
         //return map;
     }
-
-    /**
-     * Duh
-     */
-    private static void printToFile(String filename,
-            String contents) throws FileNotFoundException, UnsupportedEncodingException {
-        try (PrintWriter pw = new PrintWriter(filename, "UTF-8")) {
-            pw.println(contents);
-        }
-    }
-
-    private static void changePersonalIds(String filename)
-            throws FileNotFoundException, UnsupportedEncodingException {
-        Scanner sc = new Scanner(new File(filename), "UTF-8");
-        sc = sc.useDelimiter("[,\n]");
-
-        String headers = sc.nextLine();
-        String[] headersArray = headers.split(",");
-        headers = "NewPersonalID," + headers;
-
-        int personalIdCol = -1;
-        for (int i = 0; i < headersArray.length; i++) {
-            // Is there even a PersonalID column (lowercase because it's spelled differently)
-            if ("personalid".equals(headersArray[i].toLowerCase())) {
-                personalIdCol = i;
-                break;
-            }
-        }
-
-        StringBuilder sb = new StringBuilder();
-        sb = sb.append(headers).append('\n');
-
-        while (sc.hasNextLine()) {
-            String line = sc.nextLine();
-
-            String[] array = line.split(",");
-            String personalId;
-            try {
-                // Get the Client's personalId
-                personalId = array[personalIdCol];
-            } catch (ArrayIndexOutOfBoundsException e) {
-                break;
-            }
-
-            // Change it to the right PersonalId if it is a match
-            if (matchingClients.containsKey(personalId)) {
-                personalId = matchingClients.get(personalId);
-            }
-
-            line = personalId + "," + line;
-            sb = sb.append(line).append('\n');
-        }
-
-        String noExtensionFileName = filename.substring(0, filename.indexOf(".csv"));
-
-        // Output
-        if (!sb.toString().equals(headers + "\n")) {
-            printToFile("output/" + noExtensionFileName + "Output.csv", sb.toString());
-        }
-
-    }//end main
 
 }//end class
