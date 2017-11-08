@@ -19,7 +19,7 @@ import java.util.logging.Logger;
  * @version 2017-10-31
  */
 public class DataAnalysis {
-    
+
     private static final String INPUT_PATH = "./";
 
     //
@@ -69,8 +69,9 @@ public class DataAnalysis {
     /**
      * frequency array for groups of singles(0), twins(1), triplets(2), ...
      */
-    private static int[] multFreqs = new int[1000];
+    private static int[] multFreqs = new int[10];
     private static int test1MultCount = 0, test2MultCount = 0;
+    private static int[] twinTests = new int[4];
 
     //
     // VARS FOR FEATURE ACCURACY
@@ -82,21 +83,25 @@ public class DataAnalysis {
     private static HashMap<String, HashSet<Client>> fNameGroupMap = new HashMap<>();
     private static HashMap<String, HashSet<Client>> lNameGroupMap = new HashMap<>();
     private static HashMap<LocalDate, HashSet<Client>> dobGroupMap = new HashMap<>();
+    private static HashMap<String, HashSet<Client>> dayGroupMap = new HashMap<>();
+    private static HashMap<String, HashSet<Client>> monthGroupMap = new HashMap<>();
+    private static HashMap<String, HashSet<Client>> yearGroupMap = new HashMap<>();
+    private static HashMap<String, HashSet<Client>> genderGroupMap = new HashMap<>();
+    private static HashMap<String, HashSet<Client>> raceGroupMap = new HashMap<>();
 
     /**
      * Arrays to count frequency of field matches for various groups
      */
     //array of inividual fields to be compared
     private static String[] matchTypes = {
-        "SSN", "FName", "LName", "Suffix",
-        "DoB", "Day", "Month", "Year",
-        "Gender",
-        "Pass2"
+        "SSN", "FName", "LName", "DoB", "Day", "Month", "Year", "Gender", "Race",
+        "Suffix", "Pass2"
     };
 
     //array of groups to compare within
     private static String[] groupTypes = {
-        "SSN", "FName", "LName", "DoB", "Fail1"
+        "SSN", "FName", "LName", "DoB", "Day", "Month", "Year", "Gender", "Race",
+        "Fail1"
     };
 
     //for each group
@@ -109,7 +114,7 @@ public class DataAnalysis {
 
     //turning on DEBUG will cause data analysis to run through a small sample (1000)
     //of entries to get a quick result
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     /**
      * Reads the client.csv file, gathering data about matches
@@ -142,7 +147,7 @@ public class DataAnalysis {
         int scanCount = 0;
 
         //for each entry
-        while (sc.hasNextLine() && !(DEBUG && scanCount > 2000)) {
+        while (sc.hasNextLine() && !(DEBUG && scanCount > 10000)) {
 
             String line = sc.nextLine();
             String[] array = line.split(",");
@@ -176,13 +181,23 @@ public class DataAnalysis {
 
                 String dobDataQuality = array[9];
 
+                String race = array[10] + array[11] + array[12]
+                        + array[13] + array[14];
+
+                String raceDataQuality = array[15];
+
                 String gender = array[17];
 
                 Client client = new Client(
                         personalId, fName, lName, suffix, nameDataQuality,
                         ssn, ssnDataQuality,
-                        dobS, dob, dobDataQuality, gender, line, array
+                        dobS, dob, dobDataQuality, gender, race, raceDataQuality,
+                        line
                 );
+
+                //make comparisons between current client
+                //and each previous client
+                gatherData(client);
 
                 //map client's data to congruence classes
                 if (isFullSsn(client)) {
@@ -191,6 +206,11 @@ public class DataAnalysis {
                 mapFName(client);
                 mapLName(client);
                 mapDob(client);
+                mapDay(client);
+                mapMonth(client);
+                mapYear(client);
+                mapGender(client);
+                mapRace(client);
 
                 //add entry to list
                 entries.add(client);
@@ -201,11 +221,34 @@ public class DataAnalysis {
         }//END SCANNING
         sc.close();
 
-        //BEGIN ANALYSIS
-        //
-        //for each entry
-        for (int e = 0; e < entries.size(); e++) {
-            gatherData(entries.get(e), e + 1);
+        System.out.println("COUNTING TWINS");
+
+        //COUNT TWINS
+        for (int i = 0; i < entries.size(); i++) {
+
+            int t1 = 0, t2 = 0;
+
+            for (int j = 0; j < i; j++) {
+                Client entry = entries.get(i), otherEntry = entries.get(j);
+                if (isTwin1(entry, otherEntry)) {
+                    t1 = 1;
+                    break;
+                }
+            }
+            for (int j = 0; j < i; j++) {
+                Client entry = entries.get(i), otherEntry = entries.get(j);
+                if (isTwin2(entry, otherEntry)) {
+                    t2 = 2;
+                    break;
+                }
+            }
+
+            //[0] - Failed both tests
+            //[1] - Passed test 1, failed test 2
+            //[2] - Failed test 1, passed test 2
+            //[3] - Passed both tests
+            twinTests[t1 + t2]++;
+
         }
 
         //DISPLAY RESULTS
@@ -224,6 +267,12 @@ public class DataAnalysis {
             }
             System.out.println("|  " + compFreqs[g]);
         }
+
+        System.out.println("");
+        System.out.println("Clients who did not have a twin: " + twinTests[0]);
+        System.out.println("Clients who had a twin (1): " + twinTests[1]);
+        System.out.println("Clients who had a twin (2): " + twinTests[2]);
+        System.out.println("Clients who had a twin (1, 2): " + twinTests[3]);
     }//end main
 
     //
@@ -271,62 +320,145 @@ public class DataAnalysis {
         group.add(entry);
     }
 
+    private static void mapDay(Client entry) {
+        String day = entry.getDob().getDayOfMonth() + "";
+        HashSet<Client> group = dayGroupMap.get(day);
+        if (group == null) {
+            group = new HashSet<>();
+            dayGroupMap.put(day, group);
+        }
+        group.add(entry);
+    }
+
+    private static void mapMonth(Client entry) {
+        String month = entry.getDob().getMonthValue() + "";
+        HashSet<Client> group = monthGroupMap.get(month);
+        if (group == null) {
+            group = new HashSet<>();
+            monthGroupMap.put(month, group);
+        }
+        group.add(entry);
+    }
+
+    private static void mapYear(Client entry) {
+        String year = entry.getDob().getYear() + "";
+        HashSet<Client> group = yearGroupMap.get(year);
+        if (group == null) {
+            group = new HashSet<>();
+            yearGroupMap.put(year, group);
+        }
+        group.add(entry);
+    }
+
+    private static void mapGender(Client entry) {
+        String gender = entry.getGender();
+        HashSet<Client> group = genderGroupMap.get(gender);
+        if (group == null) {
+            group = new HashSet<>();
+            genderGroupMap.put(gender, group);
+        }
+        group.add(entry);
+    }
+
+    private static void mapRace(Client entry) {
+        String race = entry.getRace();
+        HashSet<Client> group = raceGroupMap.get(race);
+        if (group == null) {
+            group = new HashSet<>();
+            raceGroupMap.put(race, group);
+        }
+        group.add(entry);
+    }
+
     //
     //
     // DATA COLLECTING METHODS
     //
     //
-    private static void gatherData(Client entry, int start) {
-
+    private static void gatherData(Client entry) {
+        //
+        // COMPARE ALL PAIRS OF THIS CLIENT AND A PREVIOUS CLIENT
+        //
         try {
             //compare data fields for entries with matching SSNs
             for (Client otherEntry : ssnGroupMap.get(entry.getSsn())) {
-                if (entry != otherEntry) {
+                if (hasSsnMatch(entry.getSsn(), otherEntry)) {
                     compareFields(entry, otherEntry, 0);
                 }
             }
         } catch (NullPointerException e) {
-            //System.out.println("SSSSSSSSSSSSSSSSSSSSSSN");
         }
 
         try {
             //compare data fields for entries with matching FirstNames
             for (Client otherEntry : fNameGroupMap.get(entry.getfName())) {
-                if (entry != otherEntry) {
-                    compareFields(entry, otherEntry, 1);
-                }
+                compareFields(entry, otherEntry, 1);
             }
         } catch (NullPointerException e) {
-            //System.out.println("FFFFFFFFFFFFFFFFFFFFN");
         }
 
         try {
             //compare data fields for entries with matching LastNames
             for (Client otherEntry : lNameGroupMap.get(entry.getlName())) {
-                if (entry != otherEntry) {
-                    compareFields(entry, otherEntry, 2);
-                }
+                compareFields(entry, otherEntry, 2);
             }
         } catch (NullPointerException e) {
-            //System.out.println("LLLLLLLLLLLLLLLLLLLN");
         }
 
         try {
             //compare data fields for entries with matching DoBs
             for (Client otherEntry : dobGroupMap.get(entry.getDob())) {
-                if (entry != otherEntry) {
-                    compareFields(entry, otherEntry, 3);
-                }
+                compareFields(entry, otherEntry, 3);
             }
         } catch (NullPointerException e) {
-            //System.out.println("DDDDDDDDDDDDDDDDDDDDOOOOOOOOOOOOOOOBBBBBBBBB");
         }
 
-        //compare data fields for all successive entries that fail test1 [4]
-        for (int oe = start; oe < entries.size(); oe++) {
-            Client otherEntry = entries.get(oe);
-            if (!isMatch1(entry, otherEntry)) {
+        try {
+            //compare data fields for entries with matching days of birth
+            for (Client otherEntry : dayGroupMap.get(entry.getDob().getDayOfMonth() + "")) {
                 compareFields(entry, otherEntry, 4);
+            }
+        } catch (NullPointerException e) {
+        }
+
+        try {
+            //compare data fields for entries with matching months of birth
+            for (Client otherEntry : monthGroupMap.get(entry.getDob().getMonthValue() + "")) {
+                compareFields(entry, otherEntry, 5);
+            }
+        } catch (NullPointerException e) {
+        }
+
+        try {
+            //compare data fields for entries with matching years of birth
+            for (Client otherEntry : yearGroupMap.get(entry.getDob().getYear() + "")) {
+                compareFields(entry, otherEntry, 6);
+            }
+        } catch (NullPointerException e) {
+            //System.out.println("YEEEEEEEE");
+        }
+
+        try {
+            //compare data fields for entries with matching DoBs
+            for (Client otherEntry : genderGroupMap.get(entry.getGender())) {
+                compareFields(entry, otherEntry, 7);
+            }
+        } catch (NullPointerException e) {
+        }
+
+        try {
+            //compare data fields for entries with matching DoBs
+            for (Client otherEntry : raceGroupMap.get(entry.getRace())) {
+                compareFields(entry, otherEntry, 8);
+            }
+        } catch (NullPointerException e) {
+            //System.out.println("RAAAAAAAACE");
+        }
+
+        //compare data fields for all successive entries that fail test1 [9]
+        for (Client otherEntry : entries) {
+            if (!isMatch1(entry, otherEntry)) {
+                compareFields(entry, otherEntry, 9);
             }
         }
 
@@ -342,27 +474,31 @@ public class DataAnalysis {
         if (entry.getlName().equals(otherEntry.getlName()) && !entry.getlName().isEmpty()) {
             matchFreqs[groupId][2]++;
         }
-        if (!entry.getSuffix().isEmpty() && entry.getSuffix().equals(otherEntry.getSuffix())) {
-            matchFreqs[groupId][3]++;
-        }
         LocalDate dob = entry.getDob(), otherDob = otherEntry.getDob();
         if (dob.equals(otherDob)) {
-            matchFreqs[groupId][4]++;
+            matchFreqs[groupId][3]++;
         }
         if (dob.getDayOfMonth() == otherDob.getDayOfMonth()) {
-            matchFreqs[groupId][5]++;
+            matchFreqs[groupId][4]++;
         }
         if (dob.getMonthValue() == otherDob.getMonthValue()) {
-            matchFreqs[groupId][6]++;
+            matchFreqs[groupId][5]++;
         }
         if (dob.getYear() == otherDob.getYear()) {
-            matchFreqs[groupId][7]++;
+            matchFreqs[groupId][6]++;
         }
         if (entry.getGender().equals(otherEntry.getGender())) {
+            matchFreqs[groupId][7]++;
+        }
+        if (entry.getRace().equals(otherEntry.getRace())) {
             matchFreqs[groupId][8]++;
         }
-        if (isMatch2(entry, otherEntry)) {
+        if (!entry.getSuffix().equals("\"\"") && !entry.getSuffix().isEmpty()
+                && entry.getSuffix().equals(otherEntry.getSuffix())) {
             matchFreqs[groupId][9]++;
+        }
+        if (isMatch2(entry, otherEntry)) {
+            matchFreqs[groupId][10]++;
         }
 
         compFreqs[groupId]++;
@@ -519,18 +655,6 @@ public class DataAnalysis {
                     String client2FName = client.getfName();
                     // Different first names
                     if (!fName.isEmpty() && !client2FName.isEmpty() && !fName.equals(client2FName)) {
-
-                        /*
-                         //twins have been found
-                         //update count and twin status accordingly
-                         multFreqs[client.numMultiples.val]--;
-                         client.numMultiples.val++;
-                         newClient.numMultiples = client.numMultiples;
-                         multFreqs[client.numMultiples.val]++;
-
-                         test2MultCount++;
-                         //System.out.println("TWIN 2");
-                         */
                         return false;
                     }
                 }
@@ -540,12 +664,58 @@ public class DataAnalysis {
         return true;
     }//END isMatch2
 
+    private static boolean isTwin1(Client newClient, Client client) {
+
+        String[] newClientInfo = new String[]{newClient.getfName(), newClient.getlName(), newClient.getDobS()};
+
+        if (newClientInfo[1].equals(client.getlName()) && newClient.getDob().equals(client.getDob())) {
+            LocalDate entryDate = ENTRY_DATES.get(newClient.getPersonalId());
+            // Age < 18
+            if (newClient.getDob().isBefore(entryDate.minusYears(18))) {
+                String client2FName = client.getfName();
+                // Different first names
+                if (!newClientInfo[0].isEmpty() && !client2FName.isEmpty()
+                        && !newClientInfo[0].equals(client2FName)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }//end method
+
+    private static boolean isTwin2(Client newClient, Client client) {
+
+        String lName = newClient.getlName();
+        LocalDate dob = newClient.getDob();
+        String ssn = newClient.getSsn();
+        String personalId = newClient.getPersonalId();
+        String fName = newClient.getfName();
+
+        if (lName.equals(client.getlName()) && dob.equals(client.getDob())) {
+            // Different SSNs
+            if (!ssn.equals(client.getSsn())) {
+                LocalDate entryDate = ENTRY_DATES.get(personalId);
+                // Age < 18
+                if (dob.isBefore(entryDate.minusYears(18))) {
+                    String client2FName = client.getfName();
+                    // Different first names
+                    if (!fName.isEmpty() && !client2FName.isEmpty() && !fName.equals(client2FName)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }//end method
+
     /**
      * If SSNs are equal and SSN is not garbage based on spec
      */
     private static boolean hasSsnMatch(String ssn, Client client) {
         return client.getSsn().equals(ssn) && !"999999999".equals(ssn)
-                && !"000000000".equals(ssn) && !ssn.isEmpty();
+                && !"000000000".equals(ssn) && isFullSsn(client);
     }
 
     /**

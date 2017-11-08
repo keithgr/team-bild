@@ -123,6 +123,8 @@ public class Algorithm1 {
 
         System.out.println("DEDUPLICATING ...");
 
+        int scanCount = 0;
+
         //for each entry
         while (sc.hasNextLine()) {
 
@@ -158,12 +160,18 @@ public class Algorithm1 {
 
                 String dobDataQuality = array[9];
 
+                String race = array[10] + array[11] + array[12]
+                        + array[13] + array[14];
+                
+                String raceDataQuality = array[15];
+                
                 String gender = array[17];
-
+                
                 Client client = new Client(
                         personalId, fName, lName, suffix, nameDataQuality,
                         ssn, ssnDataQuality,
-                        dobS, dob, dobDataQuality, gender, line, array
+                        dobS, dob, dobDataQuality, gender, race, raceDataQuality,
+                        line
                 );
 
                 /*
@@ -180,6 +188,8 @@ public class Algorithm1 {
                 if (isNew) {
                     clients.add(client);
                 }
+
+                scanCount++;
 
             }//end special date condition
 
@@ -200,20 +210,23 @@ public class Algorithm1 {
                 if (filename.endsWith(".csv")) {
                     String noExtension = filename.substring(0, filename.indexOf(".csv"));
                     // A CSV provided by HUD
-                    
-                        if (!noExtension.endsWith("Output")) {
-                            System.out.println("Writing to " + noExtension + "Output.csv ...");
-                            changePersonalIds(filename);
-                            System.out.println("Wrote to " + noExtension + "Output.csv");
-                        }
-        
+
+                    if (!noExtension.endsWith("Output")) {
+                        System.out.println("Writing to " + noExtension + "Output.csv ...");
+                        changePersonalIds(filename);
+                        System.out.println("Wrote to " + noExtension + "Output.csv");
+                    }
+
                 }
             }//end file loop
 
         }
 
+        System.out.println("COUNT OF UNIQUE CLIENTS = " + clients.size());
+        System.out.println("TWINS FOUND IN TEST 1 = " + test1MultCount);
+        System.out.println("TWINS FOUND IN TEST 2 = " + test2MultCount);
+
         /*
-         System.out.println("COUNT OF UNIQUE CLIENTS = " + clients.size());
          for (int i = 0; i < multFreqs.length; i++) {
          System.out.println("Multiples of " + (i + 1) + " = " + multFreqs[i]);
          }
@@ -323,11 +336,6 @@ public class Algorithm1 {
 
                     //twins have been found
                     //update count and twin status accordingly
-                    multFreqs[client.numMultiples.val]--;
-                    client.numMultiples.val++;
-                    newClient.numMultiples = client.numMultiples;
-                    multFreqs[client.numMultiples.val]++;
-
                     test1MultCount++;
                     //System.out.println("TWIN 1");
 
@@ -431,11 +439,6 @@ public class Algorithm1 {
 
                         //twins have been found
                         //update count and twin status accordingly
-                        multFreqs[client.numMultiples.val]--;
-                        client.numMultiples.val++;
-                        newClient.numMultiples = client.numMultiples;
-                        multFreqs[client.numMultiples.val]++;
-
                         test2MultCount++;
                         //System.out.println("TWIN 2");
 
@@ -552,62 +555,68 @@ public class Algorithm1 {
     /**
      * Duh
      */
-    private static void printToFile(String filename,
-            String contents) throws FileNotFoundException, UnsupportedEncodingException {
+    private static void printToFile(String filename, String contents)
+            throws FileNotFoundException, UnsupportedEncodingException {
         try (PrintWriter pw = new PrintWriter(filename, "UTF-8")) {
+            //System.out.println(contents);
             pw.println(contents);
         }
     }
 
     private static void changePersonalIds(String filename)
             throws FileNotFoundException, UnsupportedEncodingException {
-        Scanner sc = new Scanner(new File(filename), "UTF-8");
-        sc = sc.useDelimiter("[,\n]");
-
-        String headers = sc.nextLine();
-        String[] headersArray = headers.split(",");
-        headers = "NewPersonalID," + headers;
-
-        int personalIdCol = -1;
-        for (int i = 0; i < headersArray.length; i++) {
-            // Is there even a PersonalID column (lowercase because it's spelled differently)
-            if ("personalid".equals(headersArray[i].toLowerCase())) {
-                personalIdCol = i;
-                break;
-            }
-        }
-
-        StringBuilder sb = new StringBuilder();
-        sb = sb.append(headers).append('\n');
-
-        while (sc.hasNextLine()) {
-            String line = sc.nextLine();
-
-            String[] array = line.split(",");
-            String personalId;
-            try {
-                // Get the Client's personalId
-                personalId = array[personalIdCol];
-            } catch (ArrayIndexOutOfBoundsException e) {
-                break;
-            }
-
-            // Change it to the right PersonalId if it is a match
-            if (matchingClients.containsKey(personalId)) {
-                personalId = matchingClients.get(personalId);
-            }
-
-            line = personalId + "," + line;
-            sb = sb.append(line).append('\n');
-        }
 
         String noExtensionFileName = filename.substring(0, filename.indexOf(".csv"));
+        String outputFilename = "output/" + noExtensionFileName + "Output.csv";
 
-        // Output
-        if (!sb.toString().equals(headers + "\n")) {
-            printToFile("output/" + noExtensionFileName + "Output.csv", sb.toString());
-        }
+        try (PrintWriter pw = new PrintWriter(outputFilename, "UTF-8")) {
 
-    }//end main
+            Scanner sc = new Scanner(new File(filename), "UTF-8");
+            sc = sc.useDelimiter("[,\n]");
+
+            String headers = sc.nextLine();
+            String[] headersArray = headers.split(",");
+            headers = "NewPersonalID," + headers;
+
+            int personalIdCol = -1;
+            for (int i = 0; i < headersArray.length; i++) {
+                // Is there even a PersonalID column (lowercase because it's spelled differently)
+                if ("personalid".equals(headersArray[i].toLowerCase())) {
+                    personalIdCol = i;
+                    break;
+                }
+            }
+
+            pw.println(headers);
+
+            int scanCount = 0;
+
+            while (sc.hasNextLine() && scanCount < 2000) {
+
+                String line = sc.nextLine();
+
+                String[] array = line.split(",");
+                String personalId;
+                try {
+                    // Get the Client's personalId
+                    personalId = array[personalIdCol];
+                } catch (ArrayIndexOutOfBoundsException e) {
+                    break;
+                }
+
+                // Change it to the right PersonalId if it is a match
+                if (matchingClients.containsKey(personalId)) {
+                    personalId = matchingClients.get(personalId);
+                }
+
+                line = personalId + "," + line;
+                pw.println(line);
+
+                //scanCount++;
+            }
+
+        }//end try
+
+    }//end changePersonalIds
 
 }//end class

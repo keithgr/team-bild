@@ -72,7 +72,7 @@ public class AlgorithmAlgOne {
                 
                 Client client = new Client(personalId, fName, lName, suffix, nameDataQuality, ssn, ssnDataQuality, dobS,
                         dob,
-                        dobDataQuality, gender, line, array);
+                        dobDataQuality, gender, "","",line);
                 boolean ifNew = checkTests(client);
                 if(ifNew){
                     clients.add(client);

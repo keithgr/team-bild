@@ -28,28 +28,22 @@ public class Client {
 
     private String gender;
 
+    private String race;
+    private String raceDataQuality;
+
     private String line;
-
-    protected class IntNode {
-
-        protected int val;
-
-        protected IntNode(int v) {
-            val = v;
-        }
-    }
 
     /**
      * the number of other clients who are multiples with this client
      */
-    public IntNode numMultiples = new IntNode(0);
+    public int[] numMultiples = new int[1];
 
     //client relation to other clients
     //private Set<Client> similarClients = new HashSet<>();
     public Client(
             String personalId, String fName, String lName, String suffix, String nameDataQuality, String ssn,
-            String ssnDataQuality, String dobS, LocalDate dob, String dobDataQuality, String gender, String line,
-            String[] allFields
+            String ssnDataQuality, String dobS, LocalDate dob, String dobDataQuality, String gender,
+            String race, String raceDataQuality, String line
     ) {
         this.personalId = personalId;
         this.fName = fName;
@@ -62,8 +56,11 @@ public class Client {
         this.dob = dob;
         this.dobDataQuality = dobDataQuality;
         this.gender = gender;
+        this.race = race;
+        this.raceDataQuality = raceDataQuality;
+
         this.line = line;
-        this.allFields = allFields;
+        this.allFields = line.split(",");
     }
 
     public String getLine() {
@@ -118,10 +115,18 @@ public class Client {
         return gender;
     }
 
-    public Object[] getAllFields(){
+    public String getRace() {
+        return race;
+    }
+
+    public String getRaceDataQuality() {
+        return raceDataQuality;
+    }
+
+    public Object[] getAllFields() {
         return allFields;
     }
-    
+
     /**
      * What to output when writing to a CSV per line
      *
