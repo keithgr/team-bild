@@ -95,18 +95,32 @@ public class DataAnalysis {
     //array of inividual fields to be compared
     private static String[] matchTypes = {
         "SSN", "FName", "LName", "DoB", "Day", "Month", "Year", "Gender", "Race",
-        "Suffix", "Pass2"
+        "Pass1", "Pass2"
     };
 
     //array of groups to compare within
     private static String[] groupTypes = {
         "SSN", "FName", "LName", "DoB", "Day", "Month", "Year", "Gender", "Race",
-        "Fail1"
+        "Pass1", "Pass2"
     };
 
     //for each group
     //a frequency array for matches in each field
     private static long[][] matchFreqs = new long[groupTypes.length][matchTypes.length];
+
+    //stores clients that have at least one match in a pair of fields
+    private static HashSet[][] entryMatches = new HashSet[groupTypes.length][matchTypes.length];
+
+    private static HashSet[] entryComps = new HashSet[groupTypes.length];
+
+    static {
+        for (int i = 0; i < groupTypes.length; i++) {
+            for (int j = 0; j < matchTypes.length; j++) {
+                entryMatches[i][j] = new HashSet();
+            }
+            entryComps[i] = new HashSet();
+        }
+    }
 
     //for each group
     //the total number of comparisons made per field
@@ -114,7 +128,7 @@ public class DataAnalysis {
 
     //turning on DEBUG will cause data analysis to run through a small sample (1000)
     //of entries to get a quick result
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = true;
 
     /**
      * Reads the client.csv file, gathering data about matches
@@ -146,8 +160,10 @@ public class DataAnalysis {
         //for DEBUG
         int scanCount = 0;
 
+        StringBuilder twinsOutput = new StringBuilder(Client.CLIENT_HEADER);
+
         //for each entry
-        while (sc.hasNextLine() && !(DEBUG && scanCount > 10000)) {
+        while (sc.hasNextLine() && !(DEBUG && scanCount > 5_000)) {
 
             String line = sc.nextLine();
             String[] array = line.split(",");
@@ -197,8 +213,7 @@ public class DataAnalysis {
 
                 //make comparisons between current client
                 //and each previous client
-                gatherData(client);
-
+                //          gatherData(client);
                 //map client's data to congruence classes
                 if (isFullSsn(client)) {
                     mapSsn(client);
@@ -221,23 +236,28 @@ public class DataAnalysis {
         }//END SCANNING
         sc.close();
 
-        System.out.println("COUNTING TWINS");
+        //GATHER DATA
+        for (Client entry : entries) {
+            gatherData(entry);
+        }
 
+        System.out.println("COUNTING TWINS");
         //COUNT TWINS
+
         for (int i = 0; i < entries.size(); i++) {
 
             int t1 = 0, t2 = 0;
 
-            for (int j = 0; j < i; j++) {
+            for (int j = 0; j < entries.size(); j++) {
                 Client entry = entries.get(i), otherEntry = entries.get(j);
-                if (isTwin1(entry, otherEntry)) {
+                if (entry != otherEntry && isTwin1(entry, otherEntry)) {
                     t1 = 1;
                     break;
                 }
             }
-            for (int j = 0; j < i; j++) {
+            for (int j = 0; j < entries.size(); j++) {
                 Client entry = entries.get(i), otherEntry = entries.get(j);
-                if (isTwin2(entry, otherEntry)) {
+                if (entry != otherEntry && isTwin2(entry, otherEntry)) {
                     t2 = 2;
                     break;
                 }
@@ -248,7 +268,9 @@ public class DataAnalysis {
             //[2] - Failed test 1, passed test 2
             //[3] - Passed both tests
             twinTests[t1 + t2]++;
-
+            if (t1 + t2 > 0) {
+                twinsOutput.append(entries.get(i)).append("\n");
+            }
         }
 
         //DISPLAY RESULTS
@@ -263,9 +285,9 @@ public class DataAnalysis {
         for (int g = 0; g < groupTypes.length; g++) {
             System.out.print(groupTypes[g] + "\t");
             for (int m = 0; m < matchTypes.length; m++) {
-                System.out.print(matchFreqs[g][m] + "\t");
+                System.out.print(entryMatches[g][m].size() + "\t");
             }
-            System.out.println("|  " + compFreqs[g]);
+            System.out.println("|  " + entryComps[g].size());
         }
 
         System.out.println("");
@@ -273,6 +295,8 @@ public class DataAnalysis {
         System.out.println("Clients who had a twin (1): " + twinTests[1]);
         System.out.println("Clients who had a twin (2): " + twinTests[2]);
         System.out.println("Clients who had a twin (1, 2): " + twinTests[3]);
+
+        printToFile("./output/TwinOutput.csv", twinsOutput.toString());
     }//end main
 
     //
@@ -439,7 +463,7 @@ public class DataAnalysis {
         }
 
         try {
-            //compare data fields for entries with matching DoBs
+            //compare data fields for entries with matching gender
             for (Client otherEntry : genderGroupMap.get(entry.getGender())) {
                 compareFields(entry, otherEntry, 7);
             }
@@ -447,7 +471,7 @@ public class DataAnalysis {
         }
 
         try {
-            //compare data fields for entries with matching DoBs
+            //compare data fields for entries with matching gender
             for (Client otherEntry : raceGroupMap.get(entry.getRace())) {
                 compareFields(entry, otherEntry, 8);
             }
@@ -455,53 +479,85 @@ public class DataAnalysis {
             //System.out.println("RAAAAAAAACE");
         }
 
-        //compare data fields for all successive entries that fail test1 [9]
+        //compare data fields for all successive entries that pass test1 [9]
         for (Client otherEntry : entries) {
-            if (!isMatch1(entry, otherEntry)) {
+            if (isMatch1(entry, otherEntry)) {
                 compareFields(entry, otherEntry, 9);
+            }
+        }
+
+        //compare data fields for all successive entries that pass test1 [10]
+        for (Client otherEntry : entries) {
+            if (isMatch2(entry, otherEntry)) {
+                compareFields(entry, otherEntry, 10);
             }
         }
 
     }//end gatherData
 
     private static void compareFields(Client entry, Client otherEntry, int groupId) {
+
+        //if an entry is compared to itself
+        //then ignore
+        if (entry == otherEntry) {
+            return;
+        }
+
         if (hasSsnMatch(entry.getSsn(), otherEntry)) {
             matchFreqs[groupId][0]++;
+            entryMatches[groupId][0].add(entry);
         }
         if (entry.getfName().equals(otherEntry.getfName()) && !entry.getfName().isEmpty()) {
             matchFreqs[groupId][1]++;
+            entryMatches[groupId][1].add(entry);
         }
         if (entry.getlName().equals(otherEntry.getlName()) && !entry.getlName().isEmpty()) {
             matchFreqs[groupId][2]++;
+            entryMatches[groupId][2].add(entry);
         }
         LocalDate dob = entry.getDob(), otherDob = otherEntry.getDob();
         if (dob.equals(otherDob)) {
             matchFreqs[groupId][3]++;
+            entryMatches[groupId][3].add(entry);
         }
         if (dob.getDayOfMonth() == otherDob.getDayOfMonth()) {
             matchFreqs[groupId][4]++;
+            entryMatches[groupId][4].add(entry);
         }
         if (dob.getMonthValue() == otherDob.getMonthValue()) {
             matchFreqs[groupId][5]++;
+            entryMatches[groupId][5].add(entry);
         }
         if (dob.getYear() == otherDob.getYear()) {
             matchFreqs[groupId][6]++;
+            entryMatches[groupId][6].add(entry);
         }
         if (entry.getGender().equals(otherEntry.getGender())) {
             matchFreqs[groupId][7]++;
+            entryMatches[groupId][7].add(entry);
         }
         if (entry.getRace().equals(otherEntry.getRace())) {
             matchFreqs[groupId][8]++;
+            entryMatches[groupId][8].add(entry);
         }
-        if (!entry.getSuffix().equals("\"\"") && !entry.getSuffix().isEmpty()
-                && entry.getSuffix().equals(otherEntry.getSuffix())) {
+        /*
+         if (!entry.getSuffix().equals("\"\"") && !entry.getSuffix().isEmpty()
+         && entry.getSuffix().equals(otherEntry.getSuffix())) {
+         matchFreqs[groupId][9]++;
+         entryMatches[groupId][9].add(entry);
+         }
+         */
+        if (isMatch1(entry, otherEntry)) {
             matchFreqs[groupId][9]++;
+            entryMatches[groupId][9].add(entry);
         }
         if (isMatch2(entry, otherEntry)) {
             matchFreqs[groupId][10]++;
+            entryMatches[groupId][10].add(entry);
         }
 
         compFreqs[groupId]++;
+        entryComps[groupId].add(entry);
     }
 
     /**
@@ -810,6 +866,14 @@ public class DataAnalysis {
         sc.close();
 
         //return map;
+    }
+
+    private static void printToFile(String filename, String contents)
+            throws FileNotFoundException, UnsupportedEncodingException {
+        try (PrintWriter pw = new PrintWriter(filename, "UTF-8")) {
+            //System.out.println(contents);
+            pw.println(contents);
+        }
     }
 
 }//end class

@@ -95,6 +95,7 @@ public class Algorithm1 {
      */
     private static long[] test2Acc = new long[4];
     private static long totalMatchCount = 0;
+    private static long[] twinTests = new long[4];
 
     /**
      * Reads the client.csv file De-duplicates entries Writes the new list of
@@ -124,6 +125,8 @@ public class Algorithm1 {
         System.out.println("DEDUPLICATING ...");
 
         int scanCount = 0;
+
+        StringBuilder twinsOutput = new StringBuilder(Client.CLIENT_HEADER);
 
         //for each entry
         while (sc.hasNextLine()) {
@@ -162,11 +165,11 @@ public class Algorithm1 {
 
                 String race = array[10] + array[11] + array[12]
                         + array[13] + array[14];
-                
+
                 String raceDataQuality = array[15];
-                
+
                 String gender = array[17];
-                
+
                 Client client = new Client(
                         personalId, fName, lName, suffix, nameDataQuality,
                         ssn, ssnDataQuality,
@@ -174,15 +177,6 @@ public class Algorithm1 {
                         line
                 );
 
-                /*
-                 //map clients SSN to the client object
-                 ArrayList<Client> group = ssnGroupMap.get(ssn);
-                 if (group == null) {
-                 group = new ArrayList<>();
-                 ssnGroupMap.put(ssn, group);
-                 }
-                 group.add(client);
-                 */
                 //if client is new, then add client to dynamic list
                 boolean isNew = isNewClient(client);
                 if (isNew) {
@@ -196,6 +190,38 @@ public class Algorithm1 {
         }//END WHILE
 
         sc.close();
+
+        System.out.println("COUNTING TWINS");
+        //COUNT TWINS
+
+        for (int i = 0; i < clients.size(); i++) {
+
+            int t1 = 0, t2 = 0;
+
+            for (int j = 0; j < clients.size(); j++) {
+                Client entry = clients.get(i), otherEntry = clients.get(j);
+                if (entry != otherEntry && isTwin1(entry, otherEntry)) {
+                    t1 = 1;
+                    break;
+                }
+            }
+            for (int j = 0; j < clients.size(); j++) {
+                Client entry = clients.get(i), otherEntry = clients.get(j);
+                if (entry != otherEntry && isTwin2(entry, otherEntry)) {
+                    t2 = 2;
+                    break;
+                }
+            }
+
+            //[0] - Failed both tests
+            //[1] - Passed test 1, failed test 2
+            //[2] - Failed test 1, passed test 2
+            //[3] - Passed both tests
+            twinTests[t1 + t2]++;
+            if (t1 + t2 > 0) {
+                twinsOutput.append(clients.get(i)).append("\n");
+            }
+        }
 
         if (WRITE) {
 
@@ -221,23 +247,14 @@ public class Algorithm1 {
             }//end file loop
 
         }
+        System.out.println("");
+        System.out.println("Clients who did not have a twin: " + twinTests[0]);
+        System.out.println("Clients who had a twin (1): " + twinTests[1]);
+        System.out.println("Clients who had a twin (2): " + twinTests[2]);
+        System.out.println("Clients who had a twin (1, 2): " + twinTests[3]);
 
-        System.out.println("COUNT OF UNIQUE CLIENTS = " + clients.size());
-        System.out.println("TWINS FOUND IN TEST 1 = " + test1MultCount);
-        System.out.println("TWINS FOUND IN TEST 2 = " + test2MultCount);
+        printToFile("./output/TwinOutput.csv", twinsOutput.toString());
 
-        /*
-         for (int i = 0; i < multFreqs.length; i++) {
-         System.out.println("Multiples of " + (i + 1) + " = " + multFreqs[i]);
-         }
-         */
-        /*
-         System.out.println("FAIL-FAIL: " + test2Acc[0]);
-         System.out.println("PASS-FAIL (false neg): " + test2Acc[1]);
-         System.out.println("FAIL-PASS (false pos): " + test2Acc[2]);
-         System.out.println("PASS-PASS: " + test2Acc[3]);
-         System.out.println("TOTAL MATCHES: " + totalMatchCount);
-         */
     }//end main
 
     /**
@@ -451,6 +468,52 @@ public class Algorithm1 {
         return true;
     }//END isMatch2
 
+    private static boolean isTwin1(Client newClient, Client client) {
+
+        String[] newClientInfo = new String[]{newClient.getfName(), newClient.getlName(), newClient.getDobS()};
+
+        if (newClientInfo[1].equals(client.getlName()) && newClient.getDob().equals(client.getDob())) {
+            LocalDate entryDate = ENTRY_DATES.get(newClient.getPersonalId());
+            // Age < 18
+            if (newClient.getDob().isBefore(entryDate.minusYears(18))) {
+                String client2FName = client.getfName();
+                // Different first names
+                if (!newClientInfo[0].isEmpty() && !client2FName.isEmpty()
+                        && !newClientInfo[0].equals(client2FName)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }//end method
+
+    private static boolean isTwin2(Client newClient, Client client) {
+
+        String lName = newClient.getlName();
+        LocalDate dob = newClient.getDob();
+        String ssn = newClient.getSsn();
+        String personalId = newClient.getPersonalId();
+        String fName = newClient.getfName();
+
+        if (lName.equals(client.getlName()) && dob.equals(client.getDob())) {
+            // Different SSNs
+            if (!ssn.equals(client.getSsn())) {
+                LocalDate entryDate = ENTRY_DATES.get(personalId);
+                // Age < 18
+                if (dob.isBefore(entryDate.minusYears(18))) {
+                    String client2FName = client.getfName();
+                    // Different first names
+                    if (!fName.isEmpty() && !client2FName.isEmpty() && !fName.equals(client2FName)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }//end method
+
     /**
      * If SSNs are equal and SSN is not garbage based on spec
      */
@@ -591,7 +654,7 @@ public class Algorithm1 {
 
             int scanCount = 0;
 
-            while (sc.hasNextLine() && scanCount < 2000) {
+            while (sc.hasNextLine()) {
 
                 String line = sc.nextLine();
 

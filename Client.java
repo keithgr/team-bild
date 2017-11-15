@@ -127,6 +127,9 @@ public class Client {
         return allFields;
     }
 
+    public static final String CLIENT_HEADER = 
+            "PersonalId,First Name,Last Name,Suffix,Name Data Quality,SSN,SSN Data Quality,DoB,DoB Data Quality,Gender\n";
+    
     /**
      * What to output when writing to a CSV per line
      *
