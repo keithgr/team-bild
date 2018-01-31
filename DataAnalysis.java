@@ -128,7 +128,7 @@ public class DataAnalysis {
 
     //turning on DEBUG will cause data analysis to run through a small sample (1000)
     //of entries to get a quick result
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     /**
      * Reads the client.csv file, gathering data about matches
@@ -163,7 +163,7 @@ public class DataAnalysis {
         StringBuilder twinsOutput = new StringBuilder(Client.CLIENT_HEADER);
 
         //for each entry
-        while (sc.hasNextLine() && !(DEBUG && scanCount > 5_000)) {
+        while (sc.hasNextLine() && !(DEBUG && scanCount > 10_000)) {
 
             String line = sc.nextLine();
             String[] array = line.split(",");
@@ -241,7 +241,7 @@ public class DataAnalysis {
             gatherData(entry);
         }
 
-        System.out.println("COUNTING TWINS");
+        System.out.println("COUNTING TWINS ...");
         //COUNT TWINS
 
         for (int i = 0; i < entries.size(); i++) {
@@ -296,7 +296,7 @@ public class DataAnalysis {
         System.out.println("Clients who had a twin (2): " + twinTests[2]);
         System.out.println("Clients who had a twin (1, 2): " + twinTests[3]);
 
-        printToFile("./output/TwinOutput.csv", twinsOutput.toString());
+        //printToFile("./output/TwinOutput.csv", twinsOutput.toString());
     }//end main
 
     //
@@ -504,40 +504,40 @@ public class DataAnalysis {
         }
 
         if (hasSsnMatch(entry.getSsn(), otherEntry)) {
-            matchFreqs[groupId][0]++;
+            //matchFreqs[groupId][0]++;
             entryMatches[groupId][0].add(entry);
         }
         if (entry.getfName().equals(otherEntry.getfName()) && !entry.getfName().isEmpty()) {
-            matchFreqs[groupId][1]++;
+            //matchFreqs[groupId][1]++;
             entryMatches[groupId][1].add(entry);
         }
         if (entry.getlName().equals(otherEntry.getlName()) && !entry.getlName().isEmpty()) {
-            matchFreqs[groupId][2]++;
+            //matchFreqs[groupId][2]++;
             entryMatches[groupId][2].add(entry);
         }
         LocalDate dob = entry.getDob(), otherDob = otherEntry.getDob();
         if (dob.equals(otherDob)) {
-            matchFreqs[groupId][3]++;
+            //matchFreqs[groupId][3]++;
             entryMatches[groupId][3].add(entry);
         }
         if (dob.getDayOfMonth() == otherDob.getDayOfMonth()) {
-            matchFreqs[groupId][4]++;
+            //matchFreqs[groupId][4]++;
             entryMatches[groupId][4].add(entry);
         }
         if (dob.getMonthValue() == otherDob.getMonthValue()) {
-            matchFreqs[groupId][5]++;
+            //matchFreqs[groupId][5]++;
             entryMatches[groupId][5].add(entry);
         }
         if (dob.getYear() == otherDob.getYear()) {
-            matchFreqs[groupId][6]++;
+            //matchFreqs[groupId][6]++;
             entryMatches[groupId][6].add(entry);
         }
         if (entry.getGender().equals(otherEntry.getGender())) {
-            matchFreqs[groupId][7]++;
+            //matchFreqs[groupId][7]++;
             entryMatches[groupId][7].add(entry);
         }
         if (entry.getRace().equals(otherEntry.getRace())) {
-            matchFreqs[groupId][8]++;
+            //matchFreqs[groupId][8]++;
             entryMatches[groupId][8].add(entry);
         }
         /*
@@ -548,15 +548,15 @@ public class DataAnalysis {
          }
          */
         if (isMatch1(entry, otherEntry)) {
-            matchFreqs[groupId][9]++;
+            //matchFreqs[groupId][9]++;
             entryMatches[groupId][9].add(entry);
         }
         if (isMatch2(entry, otherEntry)) {
-            matchFreqs[groupId][10]++;
+            //matchFreqs[groupId][10]++;
             entryMatches[groupId][10].add(entry);
         }
 
-        compFreqs[groupId]++;
+        //compFreqs[groupId]++;
         entryComps[groupId].add(entry);
     }
 
@@ -597,7 +597,7 @@ public class DataAnalysis {
         if (newClientInfo[1].equals(client.getlName()) && newClient.getDob().equals(client.getDob())) {
             LocalDate entryDate = ENTRY_DATES.get(newClient.getPersonalId());
             // Age < 18
-            if (newClient.getDob().isBefore(entryDate.minusYears(18))) {
+            if (!newClient.getDob().isBefore(entryDate.minusYears(18))) {
                 String client2FName = client.getfName();
                 // Different first names
                 if (!newClientInfo[0].isEmpty() && !client2FName.isEmpty()
@@ -707,7 +707,7 @@ public class DataAnalysis {
             if (!ssn.equals(client.getSsn())) {
                 LocalDate entryDate = ENTRY_DATES.get(personalId);
                 // Age < 18
-                if (dob.isBefore(entryDate.minusYears(18))) {
+                if (!dob.isBefore(entryDate.minusYears(18))) {
                     String client2FName = client.getfName();
                     // Different first names
                     if (!fName.isEmpty() && !client2FName.isEmpty() && !fName.equals(client2FName)) {
@@ -727,7 +727,7 @@ public class DataAnalysis {
         if (newClientInfo[1].equals(client.getlName()) && newClient.getDob().equals(client.getDob())) {
             LocalDate entryDate = ENTRY_DATES.get(newClient.getPersonalId());
             // Age < 18
-            if (newClient.getDob().isBefore(entryDate.minusYears(18))) {
+            if (!newClient.getDob().isBefore(entryDate.minusYears(18))) {
                 String client2FName = client.getfName();
                 // Different first names
                 if (!newClientInfo[0].isEmpty() && !client2FName.isEmpty()
@@ -753,7 +753,7 @@ public class DataAnalysis {
             if (!ssn.equals(client.getSsn())) {
                 LocalDate entryDate = ENTRY_DATES.get(personalId);
                 // Age < 18
-                if (dob.isBefore(entryDate.minusYears(18))) {
+                if (!dob.isBefore(entryDate.minusYears(18))) {
                     String client2FName = client.getfName();
                     // Different first names
                     if (!fName.isEmpty() && !client2FName.isEmpty() && !fName.equals(client2FName)) {

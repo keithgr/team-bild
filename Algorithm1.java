@@ -41,7 +41,12 @@ public class Algorithm1 {
      * maps personal ids to dates of entry
      */
     private static final HashMap<String, LocalDate> ENTRY_DATES = new HashMap<>();
-
+    
+    /**
+     * maps personal ids to household ids
+     */
+    private static final HashMap<String, String> HOUSEHOLD_IDS = new HashMap<>();
+    
     /**
      * indicates that DoB was not given
      */
@@ -107,8 +112,8 @@ public class Algorithm1 {
      */
     public static void main(String[] args) throws FileNotFoundException, UnsupportedEncodingException {
 
-        getEntriesDates();
-
+        getEnrollmentData();
+        
         //reads the file
         Scanner sc = new Scanner(new File(INPUT_PATH + "Client.csv"), "UTF-8");
 
@@ -191,7 +196,9 @@ public class Algorithm1 {
 
         sc.close();
 
-        System.out.println("COUNTING TWINS");
+        System.out.println("Count of unique clients = " + clients.size());
+        
+        System.out.println("COUNTING TWINS ...");
         //COUNT TWINS
 
         for (int i = 0; i < clients.size(); i++) {
@@ -200,14 +207,14 @@ public class Algorithm1 {
 
             for (int j = 0; j < clients.size(); j++) {
                 Client entry = clients.get(i), otherEntry = clients.get(j);
-                if (entry != otherEntry && isTwin1(entry, otherEntry)) {
+                if (entry != otherEntry && isTwin(entry, otherEntry)) {
                     t1 = 1;
                     break;
                 }
             }
             for (int j = 0; j < clients.size(); j++) {
                 Client entry = clients.get(i), otherEntry = clients.get(j);
-                if (entry != otherEntry && isTwin2(entry, otherEntry)) {
+                if (entry != otherEntry && isTwin(entry, otherEntry)) {
                     t2 = 2;
                     break;
                 }
@@ -223,6 +230,42 @@ public class Algorithm1 {
             }
         }
 
+        //an arraylist to store accurate entries that will replace inaccurate entries
+        ArrayList<Client> replacements = new ArrayList<>();
+        ArrayList<ArrayList<Client>> groups = new ArrayList<>();
+
+        
+        
+        
+        
+        //among a duplicate group
+        //we should select an entry with the most common DoB
+        for (Client firstClient : map.keySet()) {
+
+            //get duplicate group
+            ArrayList<Client> group = map.get(firstClient);
+
+            //determine first entry with majority DoB
+            Client majDob = getClientWithMajDob(group);
+
+            replacements.add(firstClient);
+            replacements.add(majDob);
+            groups.add(group);
+        }
+
+        for (int i = 0; i < groups.size(); i++) {
+            
+            //remove first client
+            map.put(replacements.get(2 * i), null);
+
+            //map majDob client
+            map.put(replacements.get(2 * i + 1), groups.get(i));
+        }
+
+        
+        
+        
+        
         if (WRITE) {
 
             System.out.println("WRITING OUTPUT FILES ...");
@@ -238,15 +281,16 @@ public class Algorithm1 {
                     // A CSV provided by HUD
 
                     if (!noExtension.endsWith("Output")) {
-                        System.out.println("Writing to " + noExtension + "Output.csv ...");
+                        System.out.print("Writing to " + noExtension + "Output.csv ... ");
                         changePersonalIds(filename);
-                        System.out.println("Wrote to " + noExtension + "Output.csv");
+                        System.out.println("DONE");
                     }
 
                 }
             }//end file loop
 
         }
+
         System.out.println("");
         System.out.println("Clients who did not have a twin: " + twinTests[0]);
         System.out.println("Clients who had a twin (1): " + twinTests[1]);
@@ -254,8 +298,46 @@ public class Algorithm1 {
         System.out.println("Clients who had a twin (1, 2): " + twinTests[3]);
 
         printToFile("./output/TwinOutput.csv", twinsOutput.toString());
-
     }//end main
+
+    /**
+     * Determine, from a list of clients, the client with the mode DoB
+     *
+     * @param grp A list of clients, representing a duplicate group
+     *
+     * @return The first client with the most common DoB
+     */
+    private static Client getClientWithMajDob(List<Client> grp) {
+        //frequency map of the dobs
+        HashMap<LocalDate, Integer> dobFreqs = new HashMap<>();
+
+        //count dob freqs
+        for (Client c : grp) {
+            dobFreqs.putIfAbsent(c.getDob(), 0);
+            Integer f = dobFreqs.get(c.getDob());
+            f++;
+        }
+
+        //find most frequent dob
+        int maxF = -1;
+        LocalDate majDob = null;
+        for (LocalDate ld : dobFreqs.keySet()) {
+            if (dobFreqs.get(ld) > maxF) {
+                majDob = ld;
+                maxF = dobFreqs.get(ld);
+            }
+        }
+
+        //find first client with
+        for (Client c : grp) {
+            if (c.getDob().equals(majDob)) {
+                return c;
+            }
+        }
+
+        //this case should not be reached
+        return null;
+    }
 
     /**
      * Run the algorithm
@@ -308,6 +390,8 @@ public class Algorithm1 {
         return true;
     }
 
+    
+    
     /**
      * Run test 1
      *
@@ -318,48 +402,41 @@ public class Algorithm1 {
      */
     static boolean isMatch1(Client newClient, Client client) {
 
-        //if SSNs are NOT: equal, full, and valid values
-        //then there is no match (test 1)
-        if (!hasSsnMatch(newClient.getSsn(), client)) {
+        //reject match if ssns are different
+        if(!hasSsnMatch(newClient.getSsn(), client)){
             return false;
         }
+        
+        String[] newClientInfo = {newClient.getfName(), newClient.getlName(),
+            newClient.getGender(), newClient.getDob().getMonth() + ""};
+        String[] clientInfo = {client.getfName(), client.getlName(),
+            client.getGender(), client.getDob().getMonth() + ""};
 
-        //ssns are complete and equal
-        //now check for at least two matches
-        String[] newClientInfo = new String[]{newClient.getfName(), newClient.getlName(), newClient.getDobS()};
-        String[] clientInfo = new String[]{client.getfName(), client.getlName(), client.getDobS()};
+        //number of matches for individual fields
+        int fieldMatchCount = countOfEqual(newClientInfo, clientInfo);
 
-        int equalCount = countOfEqual(newClientInfo, clientInfo);
-        if (equalCount < 2) {
+        if (fieldMatchCount < 2) {
             return false;
         }
 
         //
         //
         // TWIN CHECK for isMatch1
-        // For test 1, we remove the requirement that SSNs are distinct,
-        // as SSNs must match in order to reach the match 1 twin check
         //
         //
-        // Same birthdays and last names
-        if (newClientInfo[1].equals(client.getlName()) && newClient.getDob().equals(client.getDob())) {
-            LocalDate entryDate = ENTRY_DATES.get(newClient.getPersonalId());
-            // Age < 18
-            if (newClient.getDob().isBefore(entryDate.minusYears(18))) {
-                String client2FName = client.getfName();
-                // Different first names
-                if (!newClientInfo[0].isEmpty() && !client2FName.isEmpty()
-                        && !newClientInfo[0].equals(client2FName)) {
-
-                    //twins have been found
-                    //update count and twin status accordingly
-                    test1MultCount++;
-                    //System.out.println("TWIN 1");
-
-                    return false;
-                }
-            }
+        if(isTwin(newClient, client)){
+            return false;
         }
+        
+        String newHouseholdId = HOUSEHOLD_IDS.get(newClient.getPersonalId());
+        String houseHoldId = HOUSEHOLD_IDS.get(client.getPersonalId());
+        
+        //if both entries have non-empty equal HHIDS, then they are not
+        //the same client
+        if(!newHouseholdId.isEmpty() && newHouseholdId.equals(houseHoldId)){
+            return false;
+        }
+        
         return true;
 
     }//END isMatch1
@@ -446,10 +523,10 @@ public class Algorithm1 {
         // Same birthdays and last names
         if (lName.equals(client.getlName()) && dob.equals(client.getDob())) {
             // Different SSNs
-            if (!ssn.equals(client.getSsn())) {
+            //if (!ssn.equals(client.getSsn())) {
                 LocalDate entryDate = ENTRY_DATES.get(personalId);
-                // Age < 18
-                if (dob.isBefore(entryDate.minusYears(18))) {
+                // Age < 18                
+                if (!dob.isBefore(entryDate.minusYears(18))) {
                     String client2FName = client.getfName();
                     // Different first names
                     if (!fName.isEmpty() && !client2FName.isEmpty() && !fName.equals(client2FName)) {
@@ -462,33 +539,13 @@ public class Algorithm1 {
                         return false;
                     }
                 }
-            }
+            //}
         }
 
         return true;
     }//END isMatch2
 
-    private static boolean isTwin1(Client newClient, Client client) {
-
-        String[] newClientInfo = new String[]{newClient.getfName(), newClient.getlName(), newClient.getDobS()};
-
-        if (newClientInfo[1].equals(client.getlName()) && newClient.getDob().equals(client.getDob())) {
-            LocalDate entryDate = ENTRY_DATES.get(newClient.getPersonalId());
-            // Age < 18
-            if (newClient.getDob().isBefore(entryDate.minusYears(18))) {
-                String client2FName = client.getfName();
-                // Different first names
-                if (!newClientInfo[0].isEmpty() && !client2FName.isEmpty()
-                        && !newClientInfo[0].equals(client2FName)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }//end method
-
-    private static boolean isTwin2(Client newClient, Client client) {
+    private static boolean isTwin(Client newClient, Client client) {
 
         String lName = newClient.getlName();
         LocalDate dob = newClient.getDob();
@@ -501,7 +558,7 @@ public class Algorithm1 {
             if (!ssn.equals(client.getSsn())) {
                 LocalDate entryDate = ENTRY_DATES.get(personalId);
                 // Age < 18
-                if (dob.isBefore(entryDate.minusYears(18))) {
+                if (!dob.isBefore(entryDate.minusYears(18))) {
                     String client2FName = client.getfName();
                     // Different first names
                     if (!fName.isEmpty() && !client2FName.isEmpty() && !fName.equals(client2FName)) {
@@ -567,9 +624,10 @@ public class Algorithm1 {
 
     /**
      * Get entry dates for everyone mapping PID to the date of entry
+     * 
+     * Gets household ids
      */
-    private static void getEntriesDates() {
-        //HashMap<String, LocalDate> map = new HashMap<>();
+    private static void getEnrollmentData() {
 
         boolean flag = true;
 
@@ -599,6 +657,8 @@ public class Algorithm1 {
 
             String entryDateS = array[3];
 
+            String houseHoldId = array[4];
+            
             LocalDate entryDate;
             try {
                 entryDate = LocalDate.parse(entryDateS, DATE_FORMAT);
@@ -607,6 +667,7 @@ public class Algorithm1 {
             }
 
             ENTRY_DATES.put(personalId, entryDate);
+            HOUSEHOLD_IDS.put(personalId, houseHoldId);
 
         }
 
@@ -639,7 +700,6 @@ public class Algorithm1 {
 
             String headers = sc.nextLine();
             String[] headersArray = headers.split(",");
-            headers = "NewPersonalID," + headers;
 
             int personalIdCol = -1;
             for (int i = 0; i < headersArray.length; i++) {
@@ -650,6 +710,8 @@ public class Algorithm1 {
                 }
             }
 
+            //refrain from printing the old personal id
+            pw.print("NewPersonalId,");
             pw.println(headers);
 
             int scanCount = 0;
@@ -659,7 +721,7 @@ public class Algorithm1 {
                 String line = sc.nextLine();
 
                 String[] array = line.split(",");
-                String personalId;
+                String personalId = null;
                 try {
                     // Get the Client's personalId
                     personalId = array[personalIdCol];
@@ -672,7 +734,7 @@ public class Algorithm1 {
                     personalId = matchingClients.get(personalId);
                 }
 
-                line = personalId + "," + line;
+                pw.print(personalId + ",");
                 pw.println(line);
 
                 //scanCount++;
