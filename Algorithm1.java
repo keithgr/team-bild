@@ -436,7 +436,7 @@ public class Algorithm1 {
      */
     private static boolean isNewClient(Client newClient) {
 
-        // KG 2018-03-13: 
+        // KG 2018-03-13
         // Assume that the client is new until a match is found
         // Both tests will execute to completion
         boolean duplicateFound = false;
@@ -493,7 +493,7 @@ public class Algorithm1 {
      */
     static boolean isMatch1(Client newClient, Client client) {
 
-        // 
+        // KG 2018-03-14
         // Assume that the client is a match, until it is rejected by a filter
         boolean matchFailed = false;
 
@@ -537,7 +537,7 @@ public class Algorithm1 {
         // If two clients have a conflict in stay times at different projects,
         // then they cannot be duplicates
         //
-//        System.out.println("personal ID: " + newClient.getPersonalId());
+        //        System.out.println("personal ID: " + newClient.getPersonalId());
         if (hasStayConflict(
                 ENTRY_DATES.get(newClient.getPersonalId()),
                 EXIT_DATES.get(newClient.getPersonalId()),
@@ -571,6 +571,8 @@ public class Algorithm1 {
 
     static boolean isMatch2(Client newClient, Client client) {
 
+        // KG 2018-03-11
+        // Assume that the client is a match, until it is rejected by a filter
         boolean matchFailed = false;
 
         //
