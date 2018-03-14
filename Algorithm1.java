@@ -16,12 +16,14 @@ import java.util.logging.Logger;
 /**
  * Main program
  *
- * @author Hamza Memon, Keith Grable
+ * @author Hamza Memon, Keith Grable, Ting Liu
  * @version 2017-10-04
+ * @version 2018-02-28
  */
 public class Algorithm1 {
 
-    private static final String INPUT_PATH = "./";
+    private static final String INPUT_PATH = "input/";
+    private static final String OUTPUT_PATH = "output-D(stay-hh-conflict)/";
 
     //
     //CONSTANTS THAT CONCERN DATES
@@ -30,13 +32,13 @@ public class Algorithm1 {
      * the standard date format for our data
      */
     private static final DateTimeFormatter DATE_FORMAT
-            = DateTimeFormatter.ofPattern("M/d/yyyy");
+            = DateTimeFormatter.ofPattern("MM/dd/yyyy"); //02/26/2018 by TL
 
     /**
      * an atypical date format for our data
      */
     private static final DateTimeFormatter NEW_DATE_FORMAT
-            = DateTimeFormatter.ofPattern("yyyy-M-d");
+            = DateTimeFormatter.ofPattern("yyyy-MM-dd"); //02/26/2018 by TL
 
     /**
      * All enrollment dates: needed for twin checking
@@ -46,13 +48,20 @@ public class Algorithm1 {
     /**
      * maps personal ids to reliable dates of entry and exit
      */
-    private static final HashMap<String, ArrayList<LocalDate>> VALID_ENTRY_DATES = new HashMap<>();
-    private static final HashMap<String, ArrayList<LocalDate>> VALID_EXIT_DATES = new HashMap<>();
+    private static final HashMap<String, ArrayList<LocalDate>> EXIT_DATES = new HashMap<>();
 
     /**
      * The set of all reliable project exit ids
      */
-    private static final HashSet<String> VALID_EXIT_IDS = new HashSet<>();
+    private static final HashMap<String, LocalDate> EXIT_IDS = new HashMap<>();
+
+    private static HashSet<String> stayConflictClientsOne = new HashSet();
+
+    private static HashSet<String> houseHoldIDConflictClientsOne = new HashSet();
+    /**
+     * maps personal ids to destination code of exit
+     */
+    private static final HashMap<String, ArrayList<LocalDate>> EXIT_CODES = new HashMap<>();
 
     /**
      * maps personal ids to household ids
@@ -117,7 +126,19 @@ public class Algorithm1 {
     /**
      * Counts the number of matches that were rejected due to stay conflict
      */
-    private static long stayConflictCount = 0;
+    private static long stayConflictCountOne = 0; //02/26/18 by TL
+    private static long stayConflictCountTwo = 0; //02/26/18 by TL
+    /**
+     * Counts the number of matches that were rejected due to same household id
+     */
+    private static long sameHouseHoldOne = 0; //02/27/18 by TL
+    private static long sameHouseHoldTwo = 0; //02/27/18 by TL
+
+    private static long twinCheckOne = 0; //02/26/18 by TL
+
+    private static long twinCheckTwo = 0; //02/26/18 by TL
+
+    private static long countOfUnique = 0;
 
     /**
      * Reads the client.csv file De-duplicates entries Writes the new list of
@@ -141,7 +162,7 @@ public class Algorithm1 {
 
         // column header
         String headers = sc.nextLine();
-        StringBuilder sb = new StringBuilder(200 * 100_000);
+        StringBuilder sb = new StringBuilder();
         sb = sb.append(headers).append('\n');
 
         System.out.println("DEDUPLICATING ...");
@@ -152,6 +173,10 @@ public class Algorithm1 {
 
         //for each entry
         while (sc.hasNextLine()) {
+
+            if (scanCount % 1000 == 0) {
+                System.out.println(scanCount);
+            }
 
             String line = sc.nextLine();
             String[] array = line.split(",");
@@ -167,8 +192,8 @@ public class Algorithm1 {
 
                 String personalId = array[0];
 
-                ArrayList<LocalDate> clientEntryDates = VALID_ENTRY_DATES.get(personalId),
-                        clientExitDates = VALID_EXIT_DATES.get(personalId);
+                ArrayList<LocalDate> clientEntryDates = ENTRY_DATES.get(personalId),
+                        clientExitDates = EXIT_DATES.get(personalId);
 
                 /*
                  System.out.println(personalId);
@@ -186,7 +211,6 @@ public class Algorithm1 {
 
                 
                  */
-                //System.out.println("\n");
                 String fName = array[1];
                 String lName = array[3];
                 String suffix = array[4];
@@ -221,8 +245,12 @@ public class Algorithm1 {
 
                 //if client is new, then add client to dynamic list
                 boolean isNew = isNewClient(client);
+                //if (isNew) {
+                clients.add(client);
+                //}
+
                 if (isNew) {
-                    clients.add(client);
+                    countOfUnique++;
                 }
 
                 scanCount++;
@@ -233,8 +261,18 @@ public class Algorithm1 {
 
         sc.close();
 
-        System.out.println("Count of unique clients = " + clients.size());
-        System.out.println("Number of stay conflicts found = " + stayConflictCount);
+        System.out.println("Count of unique clients = " + countOfUnique);
+        System.out.println("Number of stay conflicts found in T1 = " + stayConflictCountOne); //02/26/18 by TL
+        System.out.println("Number of stay conflicts found in T2 = " + stayConflictCountTwo); //02/26/18 by TL
+        System.out.println("Number of Household conflicts found in T1 = " + sameHouseHoldOne); //02/27/18 by TL
+        System.out.println("Number of Household conflicts found in T2 = " + sameHouseHoldTwo); //02/27/18 by TL
+        System.out.println("twins found in test one: " + twinCheckOne); //02/26/18 by TL
+        System.out.println("twins found in test two: " + twinCheckTwo); //02/26/18 by TL
+
+
+        /*
+
+
         System.out.println("COUNTING TWINS ...");
         //COUNT TWINS
 
@@ -267,6 +305,7 @@ public class Algorithm1 {
             }
         }
 
+         */
         //an arraylist to store accurate entries that will replace inaccurate entries
         ArrayList<Client> replacements = new ArrayList<>();
         ArrayList<ArrayList<Client>> groups = new ArrayList<>();
@@ -298,7 +337,7 @@ public class Algorithm1 {
         if (WRITE) {
 
             System.out.println("WRITING OUTPUT FILES ...");
-                    // A CSV provided by HUD
+            // A CSV provided by HUD
 
             // Get all other files
             File[] files = new File(INPUT_PATH).listFiles();
@@ -310,7 +349,7 @@ public class Algorithm1 {
                     // A CSV provided by HUD
 
                     if (!noExtension.endsWith("Output")) {
-                        System.out.print("Writing to " + noExtension + "Output.csv ... ");
+                        System.out.print("Writing to " + OUTPUT_PATH + noExtension + "Output.csv ... ");
                         changePersonalIds(filename);
                         System.out.println("DONE");
                     }
@@ -320,13 +359,15 @@ public class Algorithm1 {
 
         }
 
+        /*
+        
         System.out.println("");
         System.out.println("Clients who did not have a twin: " + twinTests[0]);
         System.out.println("Clients who had a twin (1): " + twinTests[1]);
         System.out.println("Clients who had a twin (2): " + twinTests[2]);
         System.out.println("Clients who had a twin (1, 2): " + twinTests[3]);
 
-        printToFile("./output/TwinOutput.csv", twinsOutput.toString());
+         */
     }//end main
 
     /**
@@ -337,10 +378,21 @@ public class Algorithm1 {
             ArrayList<LocalDate> enrollments1, ArrayList<LocalDate> exits1,
             ArrayList<LocalDate> enrollments2, ArrayList<LocalDate> exits2
     ) {
-
-        if(enrollments1 == null || enrollments2 == null)
+        if (enrollments1 == null || enrollments2 == null) {
             return false;
-        
+        }
+        //02/26/18 by TL
+        if (exits1 == null) {
+            exits1 = new ArrayList();
+            LocalDate exit = LocalDate.of(0000, 01, 01);
+            exits1.add(exit);
+        }
+        if (exits2 == null) {
+            exits2 = new ArrayList();
+            LocalDate exit = LocalDate.of(0000, 01, 01);
+            exits2.add(exit);
+        }
+        //end adding
         for (int i = 0; i < enrollments1.size(); i++) {
             LocalDate en1 = enrollments1.get(i), ex1 = exits1.get(i);
             for (int j = 0; j < enrollments2.size(); j++) {
@@ -348,12 +400,23 @@ public class Algorithm1 {
 
                 if (en2.isBefore(en1)) {
                     if (ex2.isAfter(en1)) {
-                        return true;       // en2 and ex2 surround ex1
+                        return true;       // en2 and ex2 surround en1
                     }
                 } else if (en2.isBefore(ex1)) {
                     return true;           // en2 is between en1 and ex1
                 }
-
+                /*
+                 //02/26/18 by TL
+                 if (ex1.isBefore(ex2)) {
+                 if (ex1.isAfter(en2)) {
+                 return true;
+                 }
+                 //en1 and ex1 suround ex2    
+                 } else if (en1.isBefore(ex2)) {
+                 return true;
+                 }
+                 */
+                //end adding
             }
         }
 
@@ -409,6 +472,8 @@ public class Algorithm1 {
      */
     private static boolean isNewClient(Client newClient) {
 
+        boolean duplicateFound = false;
+
         //for each previously entered client
         for (Client otherClient : clients) {
 
@@ -426,7 +491,7 @@ public class Algorithm1 {
                 }
                 temp.add(newClient);
 
-                return false;
+                duplicateFound = true;
             }
 
             if (isMatch2(newClient, otherClient)) {
@@ -442,13 +507,13 @@ public class Algorithm1 {
                 }
                 temp.add(newClient);
 
-                return false;
+                duplicateFound = true;
 
             }
 
         }//end prev client loop
 
-        return true;
+        return !duplicateFound;
     }
 
     /**
@@ -461,27 +526,19 @@ public class Algorithm1 {
      */
     static boolean isMatch1(Client newClient, Client client) {
 
-        //
-        // Stay conflict filter
-        //
-        // If two clients have a conflict in stay times at different projects,
-        // then they cannot be duplicates
-        //
-        if (hasStayConflict(
-                VALID_ENTRY_DATES.get(newClient.getPersonalId()),
-                VALID_EXIT_DATES.get(newClient.getPersonalId()),
-                VALID_ENTRY_DATES.get(client.getPersonalId()),
-                VALID_EXIT_DATES.get(client.getPersonalId())
-        )) {
-            stayConflictCount++;
-            return false;
-        }
+        boolean matchFailed = false;
 
         //reject match if ssns are different
         if (!hasSsnMatch(newClient.getSsn(), client)) {
-            return false;
+            matchFailed = true;
         }
 
+        /*
+        String[] newClientInfo = {newClient.getfName(), newClient.getlName(),
+            newClient.getDob().toString()};
+        String[] clientInfo = {client.getfName(), client.getlName(),
+            client.getGender(), client.getDob().toString()};
+         */
         String[] newClientInfo = {newClient.getfName(), newClient.getlName(),
             newClient.getGender(), newClient.getDob().getMonth() + ""};
         String[] clientInfo = {client.getfName(), client.getlName(),
@@ -491,7 +548,7 @@ public class Algorithm1 {
         int fieldMatchCount = countOfEqual(newClientInfo, clientInfo);
 
         if (fieldMatchCount < 2) {
-            return false;
+            matchFailed = true;
         }
 
         //
@@ -500,26 +557,53 @@ public class Algorithm1 {
         //
         //
         if (isTwin1(newClient, client)) {
-            return false;
+            twinCheckOne++; //02/26/18 by TL
+            matchFailed = true;
         }
 
-        /*
         
-         String newHouseholdId = HOUSEHOLD_IDS.get(newClient.getPersonalId());
-         String houseHoldId = HOUSEHOLD_IDS.get(client.getPersonalId());
+        //moved from the top of the method to the bottom 02/26/18 by TL
+        // Stay conflict filter
+        //
+        // If two clients have a conflict in stay times at different projects,
+        // then they cannot be duplicates
+        //
+//        System.out.println("personal ID: " + newClient.getPersonalId());
+        if (hasStayConflict(
+                ENTRY_DATES.get(newClient.getPersonalId()),
+                EXIT_DATES.get(newClient.getPersonalId()),
+                ENTRY_DATES.get(client.getPersonalId()),
+                EXIT_DATES.get(client.getPersonalId())
+        )) {
+            stayConflictClientsOne.add(client.getPersonalId() + "_" + newClient.getPersonalId());
+            stayConflictCountOne++;
+            matchFailed = true;
+        }
+
         
-         //if both entries have non-empty equal HHIDS, then they are not
-         //the same client
-         if(!newHouseholdId.isEmpty() && newHouseholdId.equals(houseHoldId)){
-         return false;
-         }
         
+        String newHouseholdId = HOUSEHOLD_IDS.get(newClient.getPersonalId());
+        String houseHoldId = HOUSEHOLD_IDS.get(client.getPersonalId());
+
+        //if both entries have non-empty equal HHIDS, then they are not
+        //the same client
+        if (!newHouseholdId.equals("\"\"") && newHouseholdId.equals(houseHoldId)) {
+            //System.out.println("same household ID: \n" + newClient.toString()
+            //        + "\n" + client.toString());
+            houseHoldIDConflictClientsOne.add(client.getPersonalId() + "_" + newClient.getPersonalId());
+            sameHouseHoldOne++;
+            matchFailed = true;
+        }
+/*
          */
-        return true;
+        return !matchFailed;
 
     }//END isMatch1
 
     static boolean isMatch2(Client newClient, Client client) {
+
+        boolean matchFailed = false;
+
         //
         //
         // First set of criteria (look for matching)
@@ -532,8 +616,10 @@ public class Algorithm1 {
         String personalId = newClient.getPersonalId();
         String ssnDataQuality = newClient.getSsnDataQuality();
 
+        
         String[] client1Info = {fName, lName, dobS,};
         String[] client2Info = {client.getfName(), client.getlName(), client.getDobS()};
+
 
         //ssn equality test
         //stepA is true if ssns are complete and matching
@@ -554,7 +640,7 @@ public class Algorithm1 {
 
         //if first set fails to find a match
         if (!(stepA || stepB)) {
-            return false;
+            matchFailed = true;
         }
 
         //
@@ -588,7 +674,7 @@ public class Algorithm1 {
             };
 
             if (countOfInequal(client1Info, client2Info) >= 2) {
-                return false;
+                matchFailed = true;
             }
 
         }
@@ -599,10 +685,46 @@ public class Algorithm1 {
         //
         //
         if (isTwin2(client, newClient)) {
-            return false;
+            twinCheckTwo++; //02/26/18 by TL
+            matchFailed = true;
+        }
+        
+        //02/26/18 by TL
+        // Stay conflict filter
+        //
+        // If two clients have a conflict in stay times at different projects,
+        // then they cannot be duplicates
+        //
+//        System.out.println("personal ID: " + newClient.getPersonalId());
+        if (hasStayConflict(
+                ENTRY_DATES.get(newClient.getPersonalId()),
+                EXIT_DATES.get(newClient.getPersonalId()),
+                ENTRY_DATES.get(client.getPersonalId()),
+                EXIT_DATES.get(client.getPersonalId())
+        )) {
+            if (!stayConflictClientsOne.contains(client.getPersonalId() + "_" + newClient.getPersonalId())) {
+                stayConflictCountTwo++;
+            }
+            matchFailed = true;
+        }
+        
+        
+        
+        String newHouseholdId = HOUSEHOLD_IDS.get(newClient.getPersonalId());
+        String houseHoldId = HOUSEHOLD_IDS.get(client.getPersonalId());
+
+        //if both entries have non-empty equal HHIDS, then they are not
+        //the same client
+        if (!newHouseholdId.equals("\"\"") && newHouseholdId.equals(houseHoldId)) {
+            if (houseHoldIDConflictClientsOne.contains(client.getPersonalId() + "_" + newClient.getPersonalId())) {
+                sameHouseHoldTwo++;
+            }
+            matchFailed = true;
         }
 
-        return true;
+         
+        return !matchFailed;
+
     }//END isMatch2
 
     /**
@@ -618,7 +740,7 @@ public class Algorithm1 {
         String fName = newClient.getfName();
 
         if (lName.equals(client.getlName()) && dob.equals(client.getDob())) {
-            // Different SSNs
+            // Matching SSNs
             if (ssn.equals(client.getSsn())) {
                 //get the oldest entry
                 LocalDate entryDate = ENTRY_DATES.get(personalId).get(0);
@@ -672,7 +794,7 @@ public class Algorithm1 {
      */
     private static boolean hasSsnMatch(String ssn, Client client) {
         return client.getSsn().equals(ssn) //codes are equal
-                && "1".equals(ssn) //ssns are full
+                && "1".equals(client.getSsnDataQuality()) //ssns are full //02/26/18 modified by TL by relacing "ssn" with current method
                 && !"999999999".equals(ssn) //ssns are valid numbers
                 && !"000000000".equals(ssn);
     }
@@ -751,28 +873,24 @@ public class Algorithm1 {
 
             String exitId = array[0];
             String personalId = array[2];
-            String exitDateS = array[3];
-
-            LocalDate entryDate;
-            try {
-                entryDate = LocalDate.parse(exitDateS, DATE_FORMAT);
-            } catch (DateTimeParseException e) {
-                entryDate = LocalDate.parse(exitDateS, NEW_DATE_FORMAT);
-            }
-
-            // if the exit datum is reliable,
-            // add the exit id to the set and
-            // map the corresponding personal id
-            // to the exit date
-            if (true) {
-                VALID_EXIT_IDS.add(exitId);
-                ArrayList<LocalDate> eds = VALID_EXIT_DATES.get(personalId);
-                if (eds == null) {
-                    eds = new ArrayList<>();
-                    VALID_EXIT_DATES.put(personalId, eds);
+            String exitDateS = array[3].trim();
+            String destination = array[4].trim();
+            LocalDate exitDate = null;
+            //02/27/18 added by TL
+            if (destination.equals("30")) {
+//                System.out.println("find a wrong exit date: " + exitDateS);
+                exitDate = LocalDate.of(0000, 01, 01);
+            } else {
+                try {
+                    exitDate = LocalDate.parse(exitDateS, DATE_FORMAT);
+                } catch (DateTimeParseException e) {
+                    exitDate = LocalDate.parse(exitDateS, NEW_DATE_FORMAT);
                 }
-                eds.add(entryDate);
             }
+            //done adding
+
+            /* Map exit id to exit date to be referenced by enrollment entries */
+            EXIT_IDS.put(exitId, exitDate);
 
         }
 
@@ -801,11 +919,11 @@ public class Algorithm1 {
             }
 
             String entryId = array[0];
-            String personalId = array[1];
-            String entryDateS = array[3];
+            String personalId = array[1].trim();
+            String entryDateS = array[3].trim();
             String houseHoldId = array[4];
 
-            LocalDate entryDate;
+            LocalDate entryDate = null;
             try {
                 entryDate = LocalDate.parse(entryDateS, DATE_FORMAT);
             } catch (DateTimeParseException e) {
@@ -819,13 +937,28 @@ public class Algorithm1 {
             }
             eds.add(entryDate);
 
-            if (VALID_EXIT_IDS.contains(entryId)) {
-                ArrayList<LocalDate> veds = VALID_ENTRY_DATES.get(personalId);
-                if (veds == null) {
-                    veds = new ArrayList<>();
-                    VALID_ENTRY_DATES.put(personalId, veds);
+            /* Associate entry date with corresponding exit date, if an exit date exists */
+            LocalDate exitDate = EXIT_IDS.get(entryId);
+            if (exitDate != null) {
+
+                /* Map personal id to exit date with matching entry/exit id */
+                ArrayList<LocalDate> clientExitDates = EXIT_DATES.get(personalId);
+                if (clientExitDates == null) {
+                    clientExitDates = new ArrayList<>();
+                    EXIT_DATES.put(personalId, clientExitDates);
                 }
-                veds.add(entryDate);
+                clientExitDates.add(entryDate);
+
+            } else {
+
+                /* Map personal id to exit date that equals entry date */
+                ArrayList<LocalDate> clientExitDates = EXIT_DATES.get(personalId);
+                if (clientExitDates == null) {
+                    clientExitDates = new ArrayList<>();
+                    EXIT_DATES.put(personalId, clientExitDates);
+                }
+                clientExitDates.add(entryDate);
+
             }
 
             HOUSEHOLD_IDS.put(personalId, houseHoldId);
@@ -851,11 +984,18 @@ public class Algorithm1 {
             throws FileNotFoundException, UnsupportedEncodingException {
 
         String noExtensionFileName = filename.substring(0, filename.indexOf(".csv"));
-        String outputFilename = "output/" + noExtensionFileName + "Output.csv";
+        String outputFilename = OUTPUT_PATH + noExtensionFileName + "Output.csv";
 
+        /* Add output directory if it does not exist */
+        File outputDir = new File(OUTPUT_PATH);
+        if (!outputDir.exists()) {
+            outputDir.mkdir();
+        }
+
+        /* Output results */
         try (PrintWriter pw = new PrintWriter(outputFilename, "UTF-8")) {
 
-            Scanner sc = new Scanner(new File(filename), "UTF-8");
+            Scanner sc = new Scanner(new File(INPUT_PATH + filename), "UTF-8");
             sc = sc.useDelimiter("[,\n]");
 
             String headers = sc.nextLine();

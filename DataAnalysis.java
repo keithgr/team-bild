@@ -20,7 +20,7 @@ import java.util.logging.Logger;
  */
 public class DataAnalysis {
 
-    private static final String INPUT_PATH = "./";
+    private static final String INPUT_PATH = "input/";
 
     //
     //CONSTANTS THAT CONCERN DATES
@@ -95,13 +95,13 @@ public class DataAnalysis {
     //array of inividual fields to be compared
     private static String[] matchTypes = {
         "SSN", "FName", "LName", "DoB", "Day", "Month", "Year", "Gender", "Race",
-        "Pass1", "Pass2"
+        "Pass1", "Pass2", "Twin1", "Twin2"
     };
 
     //array of groups to compare within
     private static String[] groupTypes = {
         "SSN", "FName", "LName", "DoB", "Day", "Month", "Year", "Gender", "Race",
-        "Pass1", "Pass2"
+        "Pass1", "Pass2", "Twin1", "Twin2"
     };
 
     //for each group
@@ -130,6 +130,10 @@ public class DataAnalysis {
     //of entries to get a quick result
     private static final boolean DEBUG = false;
 
+///////////////////////////
+// M A I N   M E T H O D //
+///////////////////////////
+//
     /**
      * Reads the client.csv file, gathering data about matches
      *
@@ -163,7 +167,7 @@ public class DataAnalysis {
         StringBuilder twinsOutput = new StringBuilder(Client.CLIENT_HEADER);
 
         //for each entry
-        while (sc.hasNextLine() && !(DEBUG && scanCount > 10_000)) {
+        while (sc.hasNextLine() && !(DEBUG && scanCount >= 1_000)) {
 
             String line = sc.nextLine();
             String[] array = line.split(",");
@@ -249,14 +253,16 @@ public class DataAnalysis {
             int t1 = 0, t2 = 0;
 
             for (int j = 0; j < entries.size(); j++) {
-                Client entry = entries.get(i), otherEntry = entries.get(j);
+                Client entry = entries.get(i);
+                Client otherEntry = entries.get(j);
                 if (entry != otherEntry && isTwin1(entry, otherEntry)) {
                     t1 = 1;
                     break;
                 }
             }
             for (int j = 0; j < entries.size(); j++) {
-                Client entry = entries.get(i), otherEntry = entries.get(j);
+                Client entry = entries.get(i);
+                Client otherEntry = entries.get(j);
                 if (entry != otherEntry && isTwin2(entry, otherEntry)) {
                     t2 = 2;
                     break;
@@ -296,7 +302,7 @@ public class DataAnalysis {
         System.out.println("Clients who had a twin (2): " + twinTests[2]);
         System.out.println("Clients who had a twin (1, 2): " + twinTests[3]);
 
-        //printToFile("./output/TwinOutput.csv", twinsOutput.toString());
+        printToFile("./output/TwinOutput.csv", twinsOutput.toString());
     }//end main
 
     //
@@ -476,7 +482,6 @@ public class DataAnalysis {
                 compareFields(entry, otherEntry, 8);
             }
         } catch (NullPointerException e) {
-            //System.out.println("RAAAAAAAACE");
         }
 
         //compare data fields for all successive entries that pass test1 [9]
@@ -486,13 +491,31 @@ public class DataAnalysis {
             }
         }
 
-        //compare data fields for all successive entries that pass test1 [10]
+        //compare data fields for all successive entries that pass test2 [10]
         for (Client otherEntry : entries) {
             if (isMatch2(entry, otherEntry)) {
                 compareFields(entry, otherEntry, 10);
             }
         }
 
+        /*
+        
+        //compare data fields for all successive entries that pass twin check 1 [11]
+        for (Client otherEntry : entries) {
+            if (isTwin1(entry, otherEntry)) {
+                compareFields(entry, otherEntry, 11);
+            }
+        }
+
+        //compare data fields for all successive entries that pass twin check 2 [12]
+        for (Client otherEntry : entries) {
+            if (isTwin2(entry, otherEntry)) {
+                compareFields(entry, otherEntry, 12);
+            }
+        }
+        
+        */
+        
     }//end gatherData
 
     private static void compareFields(Client entry, Client otherEntry, int groupId) {
@@ -540,13 +563,6 @@ public class DataAnalysis {
             //matchFreqs[groupId][8]++;
             entryMatches[groupId][8].add(entry);
         }
-        /*
-         if (!entry.getSuffix().equals("\"\"") && !entry.getSuffix().isEmpty()
-         && entry.getSuffix().equals(otherEntry.getSuffix())) {
-         matchFreqs[groupId][9]++;
-         entryMatches[groupId][9].add(entry);
-         }
-         */
         if (isMatch1(entry, otherEntry)) {
             //matchFreqs[groupId][9]++;
             entryMatches[groupId][9].add(entry);
@@ -594,30 +610,10 @@ public class DataAnalysis {
         //
         //
         // Same birthdays and last names
-        if (newClientInfo[1].equals(client.getlName()) && newClient.getDob().equals(client.getDob())) {
-            LocalDate entryDate = ENTRY_DATES.get(newClient.getPersonalId());
-            // Age < 18
-            if (!newClient.getDob().isBefore(entryDate.minusYears(18))) {
-                String client2FName = client.getfName();
-                // Different first names
-                if (!newClientInfo[0].isEmpty() && !client2FName.isEmpty()
-                        && !newClientInfo[0].equals(client2FName)) {
-
-                    /*
-                     //twins have been found
-                     //update count and twin status accordingly
-                     multFreqs[client.numMultiples.val]--;
-                     client.numMultiples.val++;
-                     newClient.numMultiples = client.numMultiples;
-                     multFreqs[client.numMultiples.val]++;
-
-                     test1MultCount++;
-                     //System.out.println("TWIN 1");
-                     */
-                    return false;
-                }
-            }
+        if (isTwin1(client, newClient)) {
+            return false;
         }
+
         return true;
 
     }//END isMatch1
@@ -702,19 +698,8 @@ public class DataAnalysis {
         //
         //
         // Same birthdays and last names
-        if (lName.equals(client.getlName()) && dob.equals(client.getDob())) {
-            // Different SSNs
-            if (!ssn.equals(client.getSsn())) {
-                LocalDate entryDate = ENTRY_DATES.get(personalId);
-                // Age < 18
-                if (!dob.isBefore(entryDate.minusYears(18))) {
-                    String client2FName = client.getfName();
-                    // Different first names
-                    if (!fName.isEmpty() && !client2FName.isEmpty() && !fName.equals(client2FName)) {
-                        return false;
-                    }
-                }
-            }
+        if (isTwin2(client, newClient)) {
+            return false;
         }
 
         return true;

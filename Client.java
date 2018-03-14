@@ -1,16 +1,22 @@
+
 package research;
 
+import java.io.*;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.Properties;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
- * Describes the Client
+ * ClientEntrys have a one-to-one association with personalId; however, multiple
+ * ClientEntrys may represent the same Client
+ *
+ * @author Keith Grable
+ * @version 2018-02-17
  */
 public class Client {
-
-    private Object[] allFields;
-
-    //client's data
+    
     private String personalId;
     private String newPersonalId;
 
@@ -32,14 +38,12 @@ public class Client {
     private String raceDataQuality;
 
     private String line;
-
+    
     /**
-     * the number of other clients who are multiples with this client
+     * Constructs a ClientEntry from individual data fields
+     *
+     * @constructor
      */
-    public int[] numMultiples = new int[1];
-
-    //client relation to other clients
-    //private Set<Client> similarClients = new HashSet<>();
     public Client(
             String personalId, String fName, String lName, String suffix, String nameDataQuality, String ssn,
             String ssnDataQuality, String dobS, LocalDate dob, String dobDataQuality, String gender,
@@ -58,13 +62,7 @@ public class Client {
         this.gender = gender;
         this.race = race;
         this.raceDataQuality = raceDataQuality;
-
         this.line = line;
-        this.allFields = line.split(",");
-    }
-
-    public String getLine() {
-        return line;
     }
 
     public String getPersonalId() {
@@ -123,13 +121,13 @@ public class Client {
         return raceDataQuality;
     }
 
-    public Object[] getAllFields() {
-        return allFields;
+    public String getLine(){
+        return line;
     }
-
-    public static final String CLIENT_HEADER = 
-            "PersonalId,First Name,Last Name,Suffix,Name Data Quality,SSN,SSN Data Quality,DoB,DoB Data Quality,Gender\n";
     
+    public static final String CLIENT_HEADER
+            = "PersonalId,First Name,Last Name,Suffix,Name Data Quality,SSN,SSN Data Quality,DoB,DoB Data Quality,Gender\n";
+
     /**
      * What to output when writing to a CSV per line
      *
@@ -137,7 +135,7 @@ public class Client {
      */
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder(200);
+        StringBuilder sb = new StringBuilder();
         sb = sb.append(personalId).append(',').append(fName).append(',')
                 .append(lName).append(',').append(suffix).append(',')
                 .append(nameDataQuality).append(',').append(ssn).append(',')
@@ -145,5 +143,9 @@ public class Client {
                 .append(dobDataQuality).append(',').append(gender).append(',');
 
         return sb.toString();
+    }
+
+    private Properties load(FileReader fileReader) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 }
