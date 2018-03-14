@@ -270,42 +270,6 @@ public class Algorithm1 {
         System.out.println("twins found in test two: " + twinCheckTwo); //02/26/18 by TL
 
 
-        /*
-
-
-        System.out.println("COUNTING TWINS ...");
-        //COUNT TWINS
-
-        for (int i = 0; i < clients.size(); i++) {
-
-            int t1 = 0, t2 = 0;
-
-            for (int j = 0; j < clients.size(); j++) {
-                Client entry = clients.get(i), otherEntry = clients.get(j);
-                if (entry != otherEntry && isTwin1(entry, otherEntry)) {
-                    t1 = 1;
-                    break;
-                }
-            }
-            for (int j = 0; j < clients.size(); j++) {
-                Client entry = clients.get(i), otherEntry = clients.get(j);
-                if (entry != otherEntry && isTwin2(entry, otherEntry)) {
-                    t2 = 2;
-                    break;
-                }
-            }
-
-            //[0] - Failed both tests
-            //[1] - Passed test 1, failed test 2
-            //[2] - Failed test 1, passed test 2
-            //[3] - Passed both tests
-            twinTests[t1 + t2]++;
-            if (t1 + t2 > 0) {
-                twinsOutput.append(clients.get(i)).append("\n");
-            }
-        }
-
-         */
         //an arraylist to store accurate entries that will replace inaccurate entries
         ArrayList<Client> replacements = new ArrayList<>();
         ArrayList<ArrayList<Client>> groups = new ArrayList<>();
@@ -472,6 +436,9 @@ public class Algorithm1 {
      */
     private static boolean isNewClient(Client newClient) {
 
+        // KG 2018-03-13: 
+        // Assume that the client is new until a match is found
+        // Both tests will execute to completion
         boolean duplicateFound = false;
 
         //for each previously entered client
@@ -526,6 +493,8 @@ public class Algorithm1 {
      */
     static boolean isMatch1(Client newClient, Client client) {
 
+        // 
+        // Assume that the client is a match, until it is rejected by a filter
         boolean matchFailed = false;
 
         //reject match if ssns are different
